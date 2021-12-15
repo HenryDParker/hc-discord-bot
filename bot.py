@@ -125,8 +125,10 @@ async def check_fixtures():
         with open('leagues_dict_json.json', 'w') as f:
             json.dump(leagues_dict_json, f)
 
+
+
 @tasks.loop(minutes=60)
-async def check_next_fixtures():
+async def check_next_fixture():
     with open("fixtures_dict_json.json", "r") as read_file:
         all_fixtures = json.load(read_file)
 
@@ -240,68 +242,77 @@ async def leagues(ctx):
 
 @bot.command(name='p', help='Submit your score prediction!')
 async def user_prediction(ctx, score):
-    score.translate({ord(c): None for c in string.whitespace})
 
-    if scorePatternHigh.match(score):
-        if scorePattern.match(score):
-            # find user that sent command
-            messageAuthor = format(ctx.message.author.mention)
+    # get current time
+    current_time = int(time.time())
+    # get next fixtures time
+    fixture_time = nextFixture['fixture']['timestamp']
+    # check if the fixture has started
+    if fixture_time - current_time <= 0:
+        response = "Sorry, you're too late!\nThe match has already started!"
+    else:
+        score.translate({ord(c): None for c in string.whitespace})
 
-            # for each UserAndScore object in List
-            for UserAndScoreObj in currentUsersClassList:
-                # if User already exists in list
-                if UserAndScoreObj.name == messageAuthor:
-                    # update that user's current prediction
-                    UserAndScore.currentPrediction = score
-                    UserAndScore.name = messageAuthor
+        if scorePatternHigh.match(score):
+            if scorePattern.match(score):
+                # find user that sent command
+                messageAuthor = format(ctx.message.author.mention)
 
-                    x = currentUsersClassList.index(UserAndScoreObj)
+                # for each UserAndScore object in List
+                for UserAndScoreObj in currentUsersClassList:
+                    # if User already exists in list
+                    if UserAndScoreObj.name == messageAuthor:
+                        # update that user's current prediction
+                        UserAndScore.currentPrediction = score
+                        UserAndScore.name = messageAuthor
 
-                    currentUsersClassList[x] = UserAndScore
-                    existingUser = UserAndScore(messageAuthor, score)
-                    scoreAndName = existingUser.currentPrediction + ' - ' + existingUser.name
+                        x = currentUsersClassList.index(UserAndScoreObj)
 
-                    currentPredictions[x] = scoreAndName
+                        currentUsersClassList[x] = UserAndScore
+                        existingUser = UserAndScore(messageAuthor, score)
+                        scoreAndName = existingUser.currentPrediction + ' - ' + existingUser.name
+
+                        currentPredictions[x] = scoreAndName
+
+                        # write currentPredictionsClassList to a file
+                        # with open('currentPredictionsClassList.list', 'wb') as currentPredictionsClassList_file:
+                        #     pickle.dump(currentUsersClassList, currentPredictionsClassList_file)
+
+                        # write currentPredictions to a file
+                        # with open('currentPredictions.list', 'wb') as currentPredictions_file:
+                        #     pickle.dump(currentPredictions, currentPredictions_file)
+
+                        break
+                else:
+                    #add new user & score to list
+                    # newUser is an object of UserAndScore class with name and currentPrediction inside (more attributes to be added & set to 0/null)
+                    newUser = UserAndScore(messageAuthor, score)
+                    currentUsersClassList.append(newUser)
+
 
                     # write currentPredictionsClassList to a file
                     # with open('currentPredictionsClassList.list', 'wb') as currentPredictionsClassList_file:
                     #     pickle.dump(currentUsersClassList, currentPredictionsClassList_file)
 
+                    #with open("file.json", "w") as f:
+                    #json.dumps(currentUsersClassList, indent=2)
+                        #json.dump(currentUsersClassList, f, indent=2)
+
+                    scoreAndName = newUser.currentPrediction + ' - ' + newUser.name
+                    currentPredictions.append(scoreAndName)
+
                     # write currentPredictions to a file
-                    # with open('currentPredictions.list', 'wb') as currentPredictions_file:
-                    #     pickle.dump(currentPredictions, currentPredictions_file)
+                    with open('currentPredictions.list', 'wb') as currentPredictions_file:
+                        pickle.dump(currentPredictions, currentPredictions_file)
 
-                    break
+                    # currentPredictions = json.dumps("currentPredictions.json")
+
+                response = random.choice(correct_score_format) + messageAuthor + '!'
+
             else:
-                #add new user & score to list
-                # newUser is an object of UserAndScore class with name and currentPrediction inside (more attributes to be added & set to 0/null)
-                newUser = UserAndScore(messageAuthor, score)
-                currentUsersClassList.append(newUser)
-
-
-                # write currentPredictionsClassList to a file
-                # with open('currentPredictionsClassList.list', 'wb') as currentPredictionsClassList_file:
-                #     pickle.dump(currentUsersClassList, currentPredictionsClassList_file)
-
-                #with open("file.json", "w") as f:
-                #json.dumps(currentUsersClassList, indent=2)
-                    #json.dump(currentUsersClassList, f, indent=2)
-
-                scoreAndName = newUser.currentPrediction + ' - ' + newUser.name
-                currentPredictions.append(scoreAndName)
-
-                # write currentPredictions to a file
-                with open('currentPredictions.list', 'wb') as currentPredictions_file:
-                    pickle.dump(currentPredictions, currentPredictions_file)
-
-                # currentPredictions = json.dumps("currentPredictions.json")
-
-            response = random.choice(correct_score_format) + messageAuthor + '!'
-
+                response = "Maybe try being a little more realistic!"
         else:
-            response = "Maybe try being a little more realistic!"
-    else:
-        response = "Please structure your prediction correctly e.g. 1-0 "
+            response = "Please structure your prediction correctly e.g. 1-0 "
     await ctx.send(response)
 
 @bot.command(name='clear-predictions')
@@ -371,7 +382,7 @@ async def on_error(event, *args, **kwargs):
             raise
 
 check_fixtures.start()
-check_next_fixtures.start()
+check_next_fixture.start()
 
 bot.run(TOKEN)
 
