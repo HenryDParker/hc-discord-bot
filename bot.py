@@ -53,6 +53,8 @@ correct_score_format = [
 # Global variables
 fixture_in_progress = False
 
+channel_id = ''
+
 # regex definitions
 scorePattern = re.compile('^[0-9]{1,2}-[0-9]{1,2}$')
 scorePatternHigh = re.compile('^[0-9]{1,5}-[0-9]{1,5}$')
@@ -134,7 +136,7 @@ async def check_fixtures():
 
 @tasks.loop(minutes=30)
 async def check_next_fixture():
-    #global matchInProgress
+    global matchInProgress
     with open("fixtures_dict_json.json", "r") as read_file:
         all_fixtures = json.load(read_file)
 
@@ -170,7 +172,10 @@ async def check_next_fixture():
                     or fixture_status == 'ABD' \
                     or fixture_status == 'AWD' \
                     or fixture_status == 'WO':
-                #matchInProgress = False
+                # check if previous iteration had a match in progress
+                if matchInProgress:
+                    # Method to Give Results?
+                matchInProgress = False
                 continue
 
             # else check if fixture status is in progress
@@ -182,13 +187,16 @@ async def check_next_fixture():
                     or fixture_status == 'BT' \
                     or fixture_status == 'LIVE' \
                     or fixture_status == 'INT':
-                #matchInProgress = True
+                matchInProgress = True
                 break
 
             # else check if fixture status is not started
             elif fixture_status == 'NS':
+                # check if previous iteration had a match in progress
+                if matchInProgress:
+                    # Method to Give Results?
                 # if not matchInProgress:
-                #matchInProgress = False
+                matchInProgress = False
 
                 # is time to fixture less than the current shortest time to fixture?
                 if time_difference < shortest_time_diff:
@@ -196,6 +204,8 @@ async def check_next_fixture():
                     shortest_time_diff = time_difference
                     global nextFixture
                     nextFixture = each
+                    # get fixture id
+                    # fixture_id = (each['fixture']['id'])
 
                 else:
                     # no, continue to next fixture
@@ -203,13 +213,28 @@ async def check_next_fixture():
 
             # TBD, SUSP, INT
             else:
-                #matchInProgress = False
+                # check if previous iteration had a match in progress
+                if matchInProgress:
+                    # Method to Give Results?
+                matchInProgress = False
                 continue
+
+async def give_results():
+    results = 1-1
+    return results
+
+@bot.command(name='results', help='Match & Prediction Results')
+async def results(ctx):
+    response = '1-1'
+    await ctx.send(response)
+
+
 
 
 # When the bot joins a server
 @bot.event
 async def on_ready():
+    channel = bot.get_channel(channel_id)
     print(f'{bot.user.name} has connected to Discord!')
 
 
