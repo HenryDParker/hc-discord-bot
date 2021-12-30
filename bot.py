@@ -13,8 +13,8 @@ from discord.ext import commands, tasks
 from dotenv import load_dotenv
 from datetime import datetime
 
-
-# URL to invite bot - https://discord.com/api/oauth2/authorize?client_id=917479797242875936&permissions=274878114880&scope=bot
+# URL to invite bot
+# https://discord.com/api/oauth2/authorize?client_id=917479797242875936&permissions=274878114880&scope=bot
 
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
@@ -24,14 +24,16 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 # define bot command decorator
 bot = commands.Bot(command_prefix='!')
 
+
 # Set up UserAndScore class
 class UserAndScore:
     def __init__(self, mentionName, username, currentPrediction):
         self.mentionName = mentionName
         self.username = username
         self.currentPrediction = currentPrediction
-        #self.numCorrectPredictions = numCorrectPredictions
-        #self.leaderboardPosition = leaderboardPosition
+        # self.numCorrectPredictions = numCorrectPredictions
+        # self.leaderboardPosition = leaderboardPosition
+
 
 # Global Lists
 currentUsersClassList = []
@@ -55,7 +57,6 @@ fixture_in_progress = False
 scorePattern = re.compile('^[0-9]{1,2}-[0-9]{1,2}$')
 scorePatternHigh = re.compile('^[0-9]{1,5}-[0-9]{1,5}$')
 
-
 # try:
 #     with open('currentPredictionsClassList.list', 'rb') as currentPredictionsClassList_file:
 #         currentUsersClassList = pickle.load(currentPredictionsClassList_file)
@@ -69,8 +70,6 @@ try:
 except:
     currentUsersClassList = []
 
-
-
 try:
     # with open('currentPredictions.list', 'rb') as currentPredictions_file:
     #     currentPredictions = pickle.load(currentPredictions_file)
@@ -78,6 +77,7 @@ try:
     currentPredictions = json.loads("currentPredictions.json")
 except:
     currentPredictions = []
+
 
 # Option 2 Lists
 # currentScorePredictions = []
@@ -87,7 +87,7 @@ except:
 # Check fixture info every hour
 @tasks.loop(minutes=30)
 async def check_fixtures():
-#    if datetime.now().hour == 14:
+    #    if datetime.now().hour == 14:
     # API call to get team fixtures for 2021 Season
     url_fixtures = "https://api-football-v1.p.rapidapi.com/v3/fixtures"
 
@@ -107,7 +107,6 @@ async def check_fixtures():
 
     with open('fixtures_dict_json.json', 'w') as f:
         json.dump(fixtures_dict_json, f)
-
 
     # API call to get team info for 2021 Season
     url_leagues = "https://api-football-v1.p.rapidapi.com/v3/leagues"
@@ -133,49 +132,78 @@ async def check_fixtures():
         json.dump(leagues_dict_json, f)
 
 
-
 @tasks.loop(minutes=30)
 async def check_next_fixture():
-    global matchInProgress
+    #global matchInProgress
     with open("fixtures_dict_json.json", "r") as read_file:
         all_fixtures = json.load(read_file)
 
         # Test - pulls first fixture's timestamp
-        first_fixture = all_fixtures['response'][0]['fixture']['timestamp']
+        # first_fixture = all_fixtures['response'][0]['fixture']['timestamp']
 
         # creates list with full "response" dictionary from api
         all_fixtures_list = all_fixtures['response']
 
         # for each item in response dictionary list, find timestamp
         current_time = int(time.time())
+
+        # set shortest_time_diff to arbitrarily high value
+        global shortest_time_diff
+        shortest_time_diff = current_time
+
         for each in all_fixtures['response']:
             # get fixture timestamp
             fixture_time = (each['fixture']['timestamp'])
             # get fixture status
             fixture_status = (each['fixture']['status']['short'])
+
             time_difference = fixture_time - current_time
+
             # check if difference is negative (fixture is before now) - if yes, skip to next for loop iteration
-            #if time_difference <= 0:
+            # if time_difference <= 0:
             # check if fixture status is Full Time (or other finished) - if yes, skip to next for loop iteration
-            if fixture_status == 'FT' or fixture_status == 'AET' or fixture_status == 'PEN' or fixture_status == 'PST' or fixture_status == 'CANC' or fixture_status == 'ABD' or fixture_status == 'AWD' or fixture_status == 'WO':
-                matchInProgress = False
+            if fixture_status == 'FT' \
+                    or fixture_status == 'AET' \
+                    or fixture_status == 'PEN' \
+                    or fixture_status == 'PST' \
+                    or fixture_status == 'CANC' \
+                    or fixture_status == 'ABD' \
+                    or fixture_status == 'AWD' \
+                    or fixture_status == 'WO':
+                #matchInProgress = False
                 continue
 
             # else check if fixture status is in progress
-            elif fixture_status == '1H' or fixture_status == 'HT' or fixture_status == '2H' or fixture_status == 'ET' or fixture_status == 'P' or fixture_status == 'BT' or fixture_status == 'LIVE' or fixture_status == 'INT':
-                matchInProgress = True
+            elif fixture_status == '1H' \
+                    or fixture_status == 'HT' \
+                    or fixture_status == '2H' \
+                    or fixture_status == 'ET' \
+                    or fixture_status == 'P' \
+                    or fixture_status == 'BT' \
+                    or fixture_status == 'LIVE' \
+                    or fixture_status == 'INT':
+                #matchInProgress = True
                 break
 
             # else check if fixture status is not started
             elif fixture_status == 'NS':
-                matchInProgress = False
-                global nextFixture
-                nextFixture = each
-                break
+                # if not matchInProgress:
+                #matchInProgress = False
+
+                # is time to fixture less than the current shortest time to fixture?
+                if time_difference < shortest_time_diff:
+                    # yes, set as new shortest time and set as nextFixture
+                    shortest_time_diff = time_difference
+                    global nextFixture
+                    nextFixture = each
+
+                else:
+                    # no, continue to next fixture
+                    continue
 
             # TBD, SUSP, INT
             else:
-                matchInProgress = False
+                #matchInProgress = False
                 continue
 
 
@@ -207,10 +235,8 @@ async def on_ready():
 #     await ctx.send(response)
 
 
-
 @bot.command(name='p', help='Submit your score prediction!')
 async def user_prediction(ctx, score):
-
     # get current time
     current_time = int(time.time())
     # get next fixtures time
@@ -254,10 +280,10 @@ async def user_prediction(ctx, score):
                         break
                 else:
                     # add new user & score to list
-                    # newUser is an object of UserAndScore class with name and currentPrediction inside (more attributes to be added & set to 0/null)
+                    # newUser is an object of UserAndScore class with name and currentPrediction inside
+                    # (more attributes to be added & set to 0/null)
                     newUser = UserAndScore(authorMentionName, authorTextName, score)
                     currentUsersClassList.append(newUser)
-
 
                     # write currentPredictionsClassList to a file
                     # with open('currentPredictionsClassList.list', 'wb') as currentPredictionsClassList_file:
@@ -265,7 +291,7 @@ async def user_prediction(ctx, score):
 
                     # with open("file.json", "w") as f:
                     # json.dumps(currentUsersClassList, indent=2)
-                        # json.dump(currentUsersClassList, f, indent=2)
+                    # json.dump(currentUsersClassList, f, indent=2)
 
                     scoreAndName = newUser.currentPrediction + ' - ' + newUser.username
                     currentPredictions.append(scoreAndName)
@@ -285,11 +311,8 @@ async def user_prediction(ctx, score):
     await ctx.send(response)
 
 
-
-
 @bot.command(name='clear-predictions')
 async def clear_predictions(ctx):
-
     currentUsersClassList.clear()
     currentPredictions.clear()
 
@@ -304,7 +327,6 @@ async def clear_predictions(ctx):
     # currentPredictions = json.dumps("currentPredictions.json")
 
     await ctx.send('Files have been cleared')
-
 
 
 @bot.command(name='predictions', help='Shows all upcoming or current match predictions!')
@@ -396,7 +418,6 @@ async def leaderboard(ctx):
 #     await ctx.send(response)
 
 
-
 # on error, write to err.log
 @bot.event
 async def on_error(event, *args, **kwargs):
@@ -405,6 +426,7 @@ async def on_error(event, *args, **kwargs):
             f.write(f'Unhandled message: {args[0]}\n')
         else:
             raise
+
 
 check_fixtures.start()
 check_next_fixture.start()
