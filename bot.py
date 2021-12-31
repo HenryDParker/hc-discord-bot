@@ -51,9 +51,10 @@ correct_score_format = [
 ]
 
 # Global variables
-fixture_in_progress = False
+matchInProgress = False
+bot_ready = False
 
-channel_id = ''
+channel_id = 917754145367289929
 
 # regex definitions
 scorePattern = re.compile('^[0-9]{1,2}-[0-9]{1,2}$')
@@ -134,7 +135,7 @@ async def check_fixtures():
         json.dump(leagues_dict_json, f)
 
 
-@tasks.loop(minutes=30)
+@tasks.loop(minutes=1)
 async def check_next_fixture():
     global matchInProgress
     with open("fixtures_dict_json.json", "r") as read_file:
@@ -174,7 +175,7 @@ async def check_next_fixture():
                     or fixture_status == 'WO':
                 # check if previous iteration had a match in progress
                 if matchInProgress:
-                    # Method to Give Results?
+                    await give_results()
                 matchInProgress = False
                 continue
 
@@ -194,7 +195,7 @@ async def check_next_fixture():
             elif fixture_status == 'NS':
                 # check if previous iteration had a match in progress
                 if matchInProgress:
-                    # Method to Give Results?
+                    await give_results()
                 # if not matchInProgress:
                 matchInProgress = False
 
@@ -204,6 +205,7 @@ async def check_next_fixture():
                     shortest_time_diff = time_difference
                     global nextFixture
                     nextFixture = each
+                    await give_results()
                     # get fixture id
                     # fixture_id = (each['fixture']['id'])
 
@@ -215,18 +217,22 @@ async def check_next_fixture():
             else:
                 # check if previous iteration had a match in progress
                 if matchInProgress:
-                    # Method to Give Results?
+                    await give_results()
                 matchInProgress = False
                 continue
 
+@bot.event
 async def give_results():
-    results = 1-1
-    return results
+    # Channel ID is static as not sure how to pull Channel ID in code
+    if bot_ready:
+        channel = bot.get_channel(channel_id)
+        results = '1-1'
+        await channel.send(results)
 
-@bot.command(name='results', help='Match & Prediction Results')
-async def results(ctx):
-    response = '1-1'
-    await ctx.send(response)
+# @bot.command(name='results', help='Match & Prediction Results')
+# async def results(ctx):
+#     response = '1-1'
+#     await ctx.send(response)
 
 
 
@@ -234,8 +240,12 @@ async def results(ctx):
 # When the bot joins a server
 @bot.event
 async def on_ready():
-    channel = bot.get_channel(channel_id)
+    global bot_ready
     print(f'{bot.user.name} has connected to Discord!')
+    channel = bot.get_channel(channel_id)
+    results = f'{bot.user.name} has connected to Discord!'
+    bot_ready = True
+    await channel.send(results)
 
 
 # # Api-Football Statistics based on team id
@@ -377,14 +387,14 @@ async def current_predictions(ctx):
     # Combine attributes of each object in UserAndScore class into one string and add to new list
     if not currentPredictions:
         if is_home:
-            response = 'No score predictions vs ' + away_team + ', why not be the first!'
+            response = 'No score predictions for West Ham vs ' + away_team + ', why not be the first!'
         else:
-            response = 'No score predictions vs ' + home_team + ', why not be the first!'
+            response = 'No score predictions for ' + home_team + ' vs West Ham, why not be the first!'
     else:
         if is_home:
-            response = 'Here are all the score predictions vs ' + away_team + '\n\n' + '\n'.join(currentPredictions)
+            response = 'Here are all the score predictions for West Ham vs ' + away_team + '\n\n' + '\n'.join(currentPredictions)
         else:
-            response = 'Here are all the score predictions vs ' + home_team + '\n\n' + '\n'.join(currentPredictions)
+            response = 'Here are all the score predictions for ' + home_team + ' vs West Ham\n\n' + '\n'.join(currentPredictions)
     await ctx.send(response)
 
 
