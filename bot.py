@@ -56,6 +56,8 @@ bot_ready = False
 
 channel_id = 917754145367289929
 
+current_fixture_id = 123456789
+
 # regex definitions
 scorePattern = re.compile('^[0-9]{1,2}-[0-9]{1,2}$')
 scorePatternHigh = re.compile('^[0-9]{1,5}-[0-9]{1,5}$')
@@ -134,7 +136,7 @@ async def check_fixtures():
     with open('leagues_dict_json.json', 'w') as f:
         json.dump(leagues_dict_json, f)
 
-
+# looping every minute for testing purposes
 @tasks.loop(minutes=1)
 async def check_next_fixture():
     global matchInProgress
@@ -189,6 +191,9 @@ async def check_next_fixture():
                     or fixture_status == 'LIVE' \
                     or fixture_status == 'INT':
                 matchInProgress = True
+                # get fixture id
+                global current_fixture_id
+                current_fixture_id = (each['fixture']['id'])
                 break
 
             # else check if fixture status is not started
@@ -205,9 +210,7 @@ async def check_next_fixture():
                     shortest_time_diff = time_difference
                     global nextFixture
                     nextFixture = each
-                    await give_results()
-                    # get fixture id
-                    # fixture_id = (each['fixture']['id'])
+                    # await give_results()
 
                 else:
                     # no, continue to next fixture
@@ -225,9 +228,29 @@ async def check_next_fixture():
 async def give_results():
     # Channel ID is static as not sure how to pull Channel ID in code
     if bot_ready:
-        channel = bot.get_channel(channel_id)
-        results = '1-1'
-        await channel.send(results)
+        if not matchInProgress:
+            channel = bot.get_channel(channel_id)
+
+            with open("fixtures_dict_json.json", "r") as read_file:
+                all_fixtures = json.load(read_file)
+
+                for each in all_fixtures['response']:
+                    if current_fixture_id == (each['fixture']['id']):
+                        if (each['fixture']['status']['short']) == 'FT':
+                            home_score = (each['fixture']['score']['fulltime']['home'])
+                            away_score = (each['fixture']['score']['fulltime']['away'])
+                            fixture_result = home_score + '-' + away_score
+                        elif (each['fixture']['status']['short']) == 'AET':
+                            home_score = (each['fixture']['score']['extratime']['home'])
+                            away_score = (each['fixture']['score']['extratime']['away'])
+                            fixture_result = home_score + '-' + away_score
+                        elif (each['fixture']['status']['short']) == 'PEN':
+                            home_score = (each['fixture']['score']['extratime']['home'])
+                            away_score = (each['fixture']['score']['extratime']['away'])
+                            home_score_pens = (each['fixture']['score']['penalty']['home'])
+                            away_score_pens = (each['fixture']['score']['penalty']['away'])
+                            fixture_result = home_score + '-' + away_score + ' (' + home_score_pens + '-' + away_score_pens + ')'
+            await channel.send(fixture_result)
 
 # @bot.command(name='results', help='Match & Prediction Results')
 # async def results(ctx):
