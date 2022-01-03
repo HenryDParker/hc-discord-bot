@@ -40,6 +40,7 @@ currentUsersClassList = []
 currentPredictions = []
 
 # Global Dictionaries
+currentFixture = {}
 nextFixture = {}
 
 # list of responses to a correct score format
@@ -56,7 +57,7 @@ bot_ready = False
 
 channel_id = 917754145367289929
 
-current_fixture_id = 123456789
+current_fixture_id = None
 
 # regex definitions
 scorePattern = re.compile('^[0-9]{1,2}-[0-9]{1,2}$')
@@ -155,6 +156,24 @@ async def check_next_fixture():
         # set shortest_time_diff to arbitrarily high value
         global shortest_time_diff
         shortest_time_diff = current_time
+        global currentFixture
+        global current_fixture_id
+
+        if current_fixture_id is not None:
+            for each in all_fixtures['response']:
+                if each['fixture']['id'] == current_fixture_id:
+                    if each['fixture']['status']['short'] == 'FT' \
+                            or each == 'AET' \
+                            or each == 'PEN' \
+                            or each == 'PST' \
+                            or each == 'CANC' \
+                            or each == 'ABD' \
+                            or each == 'AWD' \
+                            or each == 'WO':
+                        await give_results()
+                        current_fixture_id = None
+                        currentFixture = {}
+                        break
 
         for each in all_fixtures['response']:
             # get fixture timestamp
@@ -176,9 +195,6 @@ async def check_next_fixture():
                     or fixture_status == 'AWD' \
                     or fixture_status == 'WO':
                 # check if previous iteration had a match in progress
-                if matchInProgress:
-                    await give_results()
-                matchInProgress = False
                 continue
 
             # else check if fixture status is in progress
@@ -192,17 +208,13 @@ async def check_next_fixture():
                     or fixture_status == 'INT':
                 matchInProgress = True
                 # get fixture id
-                global current_fixture_id
                 current_fixture_id = (each['fixture']['id'])
+                currentFixture = each
                 break
 
             # else check if fixture status is not started
             elif fixture_status == 'NS':
-                # check if previous iteration had a match in progress
-                if matchInProgress:
-                    await give_results()
                 # if not matchInProgress:
-                matchInProgress = False
 
                 # is time to fixture less than the current shortest time to fixture?
                 if time_difference < shortest_time_diff:
@@ -210,7 +222,6 @@ async def check_next_fixture():
                     shortest_time_diff = time_difference
                     global nextFixture
                     nextFixture = each
-                    # await give_results()
 
                 else:
                     # no, continue to next fixture
@@ -221,36 +232,38 @@ async def check_next_fixture():
                 # check if previous iteration had a match in progress
                 if matchInProgress:
                     await give_results()
-                matchInProgress = False
+                    matchInProgress = False
                 continue
 
 @bot.event
 async def give_results():
     # Channel ID is static as not sure how to pull Channel ID in code
     if bot_ready:
-        if not matchInProgress:
-            channel = bot.get_channel(channel_id)
+        channel = bot.get_channel(channel_id)
 
-            with open("fixtures_dict_json.json", "r") as read_file:
-                all_fixtures = json.load(read_file)
+        with open("fixtures_dict_json.json", "r") as read_file:
+            all_fixtures = json.load(read_file)
 
-                for each in all_fixtures['response']:
-                    if current_fixture_id == (each['fixture']['id']):
-                        if (each['fixture']['status']['short']) == 'FT':
-                            home_score = (each['fixture']['score']['fulltime']['home'])
-                            away_score = (each['fixture']['score']['fulltime']['away'])
-                            fixture_result = home_score + '-' + away_score
-                        elif (each['fixture']['status']['short']) == 'AET':
-                            home_score = (each['fixture']['score']['extratime']['home'])
-                            away_score = (each['fixture']['score']['extratime']['away'])
-                            fixture_result = home_score + '-' + away_score
-                        elif (each['fixture']['status']['short']) == 'PEN':
-                            home_score = (each['fixture']['score']['extratime']['home'])
-                            away_score = (each['fixture']['score']['extratime']['away'])
-                            home_score_pens = (each['fixture']['score']['penalty']['home'])
-                            away_score_pens = (each['fixture']['score']['penalty']['away'])
-                            fixture_result = home_score + '-' + away_score + ' (' + home_score_pens + '-' + away_score_pens + ')'
+            for each in all_fixtures['response']:
+                if current_fixture_id == (each['fixture']['id']):
+                    home_team = each['teams']['home']['name']
+                    away_team = each['teams']['away']['name']
+                    if (each['fixture']['status']['short']) == 'FT':
+                        home_score = (each['score']['fulltime']['home'])
+                        away_score = (each['score']['fulltime']['away'])
+                        fixture_result = f'{home_team} {str(home_score)} - {str(away_score)} {away_team}'
+                    elif (each['fixture']['status']['short']) == 'AET':
+                        home_score = (each['score']['extratime']['home'])
+                        away_score = (each['score']['extratime']['away'])
+                        fixture_result = f'{home_team} {str(home_score)} - {str(away_score)} {away_team}'
+                    elif (each['fixture']['status']['short']) == 'PEN':
+                        home_score = (each['score']['extratime']['home'])
+                        away_score = (each['score']['extratime']['away'])
+                        home_score_pens = (each['score']['penalty']['home'])
+                        away_score_pens = (each['score']['penalty']['away'])
+                        fixture_result = f'{home_team} {str(home_score)} ({str(home_score_pens)}) - {str(away_score)} ({str(away_score_pens)}) {away_team}'
             await channel.send(fixture_result)
+
 
 # @bot.command(name='results', help='Match & Prediction Results')
 # async def results(ctx):
@@ -300,7 +313,7 @@ async def user_prediction(ctx, score):
     # get next fixtures time
     fixture_time = nextFixture['fixture']['timestamp']
     # check if the fixture has started
-    if fixture_time - current_time <= 0:
+    if fixture_time - current_time <= 0 or matchInProgress:
         response = "Sorry, you're too late!\nThe match has already started!"
     else:
         score.translate({ord(c): None for c in string.whitespace})
@@ -398,8 +411,13 @@ async def current_predictions(ctx):
     # ]
     # # put all values in list into "response" string separated by a new line "\n"
     # response = 'Here are all the predictions vs Chelsea\n\n' + '\n'.join(predictions)
+
     home_team = nextFixture['teams']['home']['name']
     away_team = nextFixture['teams']['away']['name']
+
+    if matchInProgress:
+        home_team = currentFixture['teams']['home']['name']
+        away_team = currentFixture['teams']['away']['name']
 
     # Is the match at Home or Away
     if home_team == 'West Ham':
