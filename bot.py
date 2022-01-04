@@ -11,7 +11,7 @@ import time
 
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
-# from datetime import datetime
+from datetime import date
 
 # URL to invite bot
 # https://discord.com/api/oauth2/authorize?client_id=917479797242875936&permissions=274878114880&scope=bot
@@ -19,6 +19,7 @@ from dotenv import load_dotenv
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 # GUILD = os.getenv('DISCORD_GUILD')
+RAPIDAPIKEY = os.getenv('RAPIDAPI_KEY')
 
 # client = discord.Client()
 # define bot command decorator
@@ -54,10 +55,11 @@ correct_score_format = [
 # Global variables
 matchInProgress = False
 bot_ready = False
-
-channel_id = 917754145367289929
-
 current_fixture_id = None
+
+# channel_id is hard coded in as not sure how to extract channel id without hard coding
+# this will need to be changed for Hammers Chat channel as this is currently Test Server channel id
+channel_id = 917754145367289929
 
 # regex definitions
 scorePattern = re.compile('^[0-9]{1,2}-[0-9]{1,2}$')
@@ -97,11 +99,25 @@ async def check_fixtures():
     # API call to get team fixtures for 2021 Season
     url_fixtures = "https://api-football-v1.p.rapidapi.com/v3/fixtures"
 
-    querystring_fixtures = {"season": "2021", "team": "48"}
+    # find todays date
+    today = date.today()
+    # set the month to an int e.g. 02
+    today_month = int(today.strftime("%m"))
+    # set the year to an int e.g. 2021
+    today_year = int(today.strftime("%Y"))
+
+    # if the month is less than 6, set the current_season to the current year, -1 e.g in 02/2022 the season is 2021
+    if today_month < 6:
+        current_season = today_year - 1
+    else:
+        current_season = today_year
+
+
+    querystring_fixtures = {"season": current_season, "team": "48"}
 
     headers_fixtures = {
         'x-rapidapi-host': "api-football-v1.p.rapidapi.com",
-        'x-rapidapi-key': "44ffe7d755msh9b3e1938f982d4bp104096jsn7da8ebb4fde8"
+        'x-rapidapi-key': RAPIDAPIKEY
     }
 
     api_response = requests.request("GET", url_fixtures, headers=headers_fixtures, params=querystring_fixtures)
@@ -118,13 +134,13 @@ async def check_fixtures():
     url_leagues = "https://api-football-v1.p.rapidapi.com/v3/leagues"
 
     querystring_leagues = {
-        "season": "2021",
+        "season": current_season,
         "team": "48"
     }
 
     headers_leagues = {
         'x-rapidapi-host': "api-football-v1.p.rapidapi.com",
-        'x-rapidapi-key': "44ffe7d755msh9b3e1938f982d4bp104096jsn7da8ebb4fde8"
+        'x-rapidapi-key': RAPIDAPIKEY
     }
 
     api_response = requests.request("GET", url_leagues, headers=headers_leagues, params=querystring_leagues)
@@ -353,7 +369,7 @@ async def on_ready():
 #
 #     headers = {
 #         'x-rapidapi-host': "api-football-v1.p.rapidapi.com",
-#         'x-rapidapi-key': "44ffe7d755msh9b3e1938f982d4bp104096jsn7da8ebb4fde8"
+#         'x-rapidapi-key': RAPIDAPIKEY
 #     }
 #
 #     api_response = requests.request("GET", url, headers=headers, params=querystring)
@@ -366,7 +382,7 @@ async def on_ready():
 #     await ctx.send(response)
 
 
-@bot.command(name='p', help='Submit your score prediction! e.g. 2-1')
+@bot.command(name='p', help='Submit your score prediction! e.g. !p 2-1')
 async def user_prediction(ctx, score):
     # get current time
     current_time = int(time.time())
@@ -408,6 +424,8 @@ async def user_prediction(ctx, score):
                         # with open('currentPredictions.list', 'wb') as currentPredictions_file:
                         #     pickle.dump(currentPredictions, currentPredictions_file)
 
+                        response = 'Prediction updated\n' + random.choice(correct_score_format) + author_mention_name + '!'
+
                         break
                 else:
                     # add new user & score to list
@@ -433,7 +451,7 @@ async def user_prediction(ctx, score):
 
                     # currentPredictions = json.dumps("currentPredictions.json")
 
-                response = random.choice(correct_score_format) + author_mention_name + '!'
+                    response = random.choice(correct_score_format) + author_mention_name + '!'
 
             else:
                 response = "Maybe try being a little more realistic!"
@@ -521,7 +539,7 @@ async def leaderboard(ctx):
 #     #
 #     # headers = {
 #     #     'x-rapidapi-host': "api-football-v1.p.rapidapi.com",
-#     #     'x-rapidapi-key': "44ffe7d755msh9b3e1938f982d4bp104096jsn7da8ebb4fde8"
+#     #     'x-rapidapi-key': RAPIDAPIKEY
 #     # }
 #     #
 #     # api_response = requests.request("GET", url, headers=headers, params=querystring)
