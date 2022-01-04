@@ -251,18 +251,52 @@ async def give_results():
                     if (each['fixture']['status']['short']) == 'FT':
                         home_score = (each['score']['fulltime']['home'])
                         away_score = (each['score']['fulltime']['away'])
-                        fixture_result = f'{home_team} {str(home_score)} - {str(away_score)} {away_team}'
+                        # Full fixture result with team names
+                        fixture_result_full = f'{home_team} {str(home_score)} - {str(away_score)} {away_team}'
+                        # Short fixture result for prediction comparison
+                        fixture_result_score = f'{str(home_score)}-{str(away_score)}'
                     elif (each['fixture']['status']['short']) == 'AET':
                         home_score = (each['score']['extratime']['home'])
                         away_score = (each['score']['extratime']['away'])
-                        fixture_result = f'{home_team} {str(home_score)} - {str(away_score)} {away_team}'
+                        # Full fixture result with team names
+                        fixture_result_full = f'{home_team} {str(home_score)} - {str(away_score)} {away_team}'
+                        # Short fixture result for prediction comparison
+                        fixture_result_score = f'{str(home_score)}-{str(away_score)}'
                     elif (each['fixture']['status']['short']) == 'PEN':
                         home_score = (each['score']['extratime']['home'])
                         away_score = (each['score']['extratime']['away'])
                         home_score_pens = (each['score']['penalty']['home'])
                         away_score_pens = (each['score']['penalty']['away'])
-                        fixture_result = f'{home_team} {str(home_score)} ({str(home_score_pens)}) - {str(away_score)} ({str(away_score_pens)}) {away_team}'
-            await channel.send(fixture_result)
+                        # Full fixture result with team names (and penalties)
+                        fixture_result_full = f'{home_team} {str(home_score)} ({str(home_score_pens)})' \
+                                         f' - {str(away_score)} ({str(away_score_pens)}) {away_team}'
+                        # Short fixture result for prediction comparison  (NOT including penalties at the moment)
+                        fixture_result_score = f'{str(home_score)}-{str(away_score)}'
+
+            # Create an initially empty list for the correct predictions
+            correct_prediction_list = []
+            # For each object in class, check if their currentPrediction matches the fixture score result
+            # then add to correct_prediction_list if it does
+            for each in currentUsersClassList:
+                if each.currentPrediction == fixture_result_score:
+                    correct_prediction_user_mention = each.mentionName
+                    correct_prediction_list.append(correct_prediction_user_mention)
+            # Check if list is empty (no correct guesses) and print a response accordingly
+            # --- unsure whether this is the correct pythonic way to check empty list
+            # if correct_prediction_list is None:
+            if not correct_prediction_list:
+                response = f'The match finished {fixture_result_full}\n\n' \
+                           f'Unfortunately no one guessed the score correctly!'
+            # else there must be at least one correct prediction, so congratulate user(s) with an @Mention tag
+            else:
+                correct_predictions = '\n'.join(correct_prediction_list)
+            response = f'The match finished {fixture_result_full}\n\n' \
+                       f'Well done:\n' \
+                       f'{correct_predictions}'
+            # now clear all user Objects' current predictions in the list
+            for each in currentUsersClassList:
+                each.currentPrediction = None
+            await channel.send(response)
 
 
 # @bot.command(name='results', help='Match & Prediction Results')
@@ -330,7 +364,7 @@ async def user_prediction(ctx, score):
                     if UserAndScoreObj.mentionName == authorMentionName:
                         # update that user's current prediction
                         UserAndScore.currentPrediction = score
-                        UserAndScore.name = authorMentionName
+                        UserAndScore.mentionName = authorMentionName
 
                         x = currentUsersClassList.index(UserAndScoreObj)
 
@@ -428,14 +462,16 @@ async def current_predictions(ctx):
     # Combine attributes of each object in UserAndScore class into one string and add to new list
     if not currentPredictions:
         if is_home:
-            response = 'No score predictions for West Ham vs ' + away_team + ', why not be the first!'
+            response = f'No score predictions for West Ham vs {away_team}, why not be the first!'
         else:
-            response = 'No score predictions for ' + home_team + ' vs West Ham, why not be the first!'
+            response = f'No score predictions for {home_team} vs West Ham, why not be the first!'
     else:
         if is_home:
-            response = 'Here are all the score predictions for West Ham vs ' + away_team + '\n\n' + '\n'.join(currentPredictions)
+            response = f'Here are all the score predictions for West Ham vs {away_team}\n\n'\
+                       + '\n'.join(currentPredictions)
         else:
-            response = 'Here are all the score predictions for ' + home_team + ' vs West Ham\n\n' + '\n'.join(currentPredictions)
+            response = f'Here are all the score predictions for {home_team} vs West Ham\n\n'\
+                       + '\n'.join(currentPredictions)
     await ctx.send(response)
 
 
