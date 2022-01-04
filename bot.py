@@ -2,7 +2,7 @@
 import json
 import os
 import random
-import discord
+# import discord
 import pickle
 import string
 import re
@@ -11,7 +11,7 @@ import time
 
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
-from datetime import datetime
+# from datetime import datetime
 
 # URL to invite bot
 # https://discord.com/api/oauth2/authorize?client_id=917479797242875936&permissions=274878114880&scope=bot
