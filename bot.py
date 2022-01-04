@@ -323,9 +323,9 @@ async def next_fixture():
             is_home = False
 
         if is_home:
-            response = f'The next fixture is West Ham vs {next_away_team}\nGet your predictions in now using !p\n'
+            response = f'The next fixture is **West Ham vs {next_away_team}**\nGet your predictions in now using _!p_\n'
         else:
-            response = f'The next fixture is {next_home_team} vs West Ham\nGet your predictions in now using !p\n'
+            response = f'The next fixture is **{next_home_team} vs West Ham**\nGet your predictions in now using _!p_\n'
 
         await channel.send(response)
 
