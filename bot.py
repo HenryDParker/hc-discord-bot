@@ -285,14 +285,16 @@ async def give_results():
             # --- unsure whether this is the correct pythonic way to check empty list
             # if correct_prediction_list is None:
             if not correct_prediction_list:
-                response = f'The match finished {fixture_result_full}\n\n' \
+                response = f'The match finished {fixture_result_full}\n' \
+                           f'\n' \
                            f'Unfortunately no one guessed the score correctly!'
             # else there must be at least one correct prediction, so congratulate user(s) with an @Mention tag
             else:
                 correct_predictions = '\n'.join(correct_prediction_list)
-            response = f'The match finished {fixture_result_full}\n\n' \
-                       f'Well done:\n' \
-                       f'{correct_predictions}'
+                response = f'The match finished {fixture_result_full}\n' \
+                           f'\n' \
+                           f'Well done:\n' \
+                           f'{correct_predictions}'
             # now clear all user Objects' current predictions in the list
             for each in currentUsersClassList:
                 each.currentPrediction = None
