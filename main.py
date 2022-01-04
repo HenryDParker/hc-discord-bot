@@ -1,5 +1,0 @@
-import bot
-
-bot
-
-exit()
