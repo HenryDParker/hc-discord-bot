@@ -137,6 +137,9 @@ async def check_fixtures():
     with open('leagues_dict_json.json', 'w') as f:
         json.dump(leagues_dict_json, f)
 
+
+
+
 # looping every minute for testing purposes
 @tasks.loop(minutes=1)
 async def check_next_fixture():
@@ -235,6 +238,8 @@ async def check_next_fixture():
                     matchInProgress = False
                 continue
 
+
+
 @bot.event
 async def give_results():
     # Channel ID is static as not sure how to pull Channel ID in code
@@ -299,12 +304,30 @@ async def give_results():
             for each in currentUsersClassList:
                 each.currentPrediction = None
             await channel.send(response)
+            await next_fixture()
 
 
-# @bot.command(name='results', help='Match & Prediction Results')
-# async def results(ctx):
-#     response = '1-1'
-#     await ctx.send(response)
+@bot.event
+async def next_fixture():
+    # Channel ID is static as not sure how to pull Channel ID in code
+    if bot_ready:
+        channel = bot.get_channel(channel_id)
+        # Grab details for next match
+
+        next_home_team = nextFixture['teams']['home']['name']
+        next_away_team = nextFixture['teams']['away']['name']
+
+        if next_home_team == 'West Ham':
+            is_home = True
+        else:
+            is_home = False
+
+        if is_home:
+            response = f'The next fixture is West Ham vs {next_away_team}\nGet your predictions in now using !p\n'
+        else:
+            response = f'The next fixture is {next_home_team} vs West Ham\nGet your predictions in now using !p\n'
+
+        await channel.send(response)
 
 
 
@@ -318,6 +341,7 @@ async def on_ready():
     results = f'{bot.user.name} has connected to Discord!'
     bot_ready = True
     await channel.send(results)
+    await next_fixture()
 
 
 # # Api-Football Statistics based on team id
@@ -342,7 +366,7 @@ async def on_ready():
 #     await ctx.send(response)
 
 
-@bot.command(name='p', help='Submit your score prediction!')
+@bot.command(name='p', help='Submit your score prediction! e.g. 2-1')
 async def user_prediction(ctx, score):
     # get current time
     current_time = int(time.time())
@@ -357,24 +381,24 @@ async def user_prediction(ctx, score):
         if scorePatternHigh.match(score):
             if scorePattern.match(score):
                 # find user that sent command
-                authorMentionName = format(ctx.message.author.mention)
-                authorTextName = format(ctx.message.author)
+                author_mention_name = format(ctx.message.author.mention)
+                author_text_name = format(ctx.message.author)
 
                 # for each UserAndScore object in List
                 for UserAndScoreObj in currentUsersClassList:
                     # if User already exists in list
-                    if UserAndScoreObj.mentionName == authorMentionName:
+                    if UserAndScoreObj.mentionName == author_mention_name:
                         # update that user's current prediction
                         UserAndScore.currentPrediction = score
-                        UserAndScore.mentionName = authorMentionName
+                        UserAndScore.mentionName = author_mention_name
 
                         x = currentUsersClassList.index(UserAndScoreObj)
 
                         currentUsersClassList[x] = UserAndScore
-                        existingUser = UserAndScore(authorMentionName, authorTextName, score)
-                        scoreAndName = existingUser.currentPrediction + ' - ' + existingUser.username
+                        existing_user = UserAndScore(author_mention_name, author_text_name, score)
+                        score_and_name = existing_user.currentPrediction + ' - ' + existing_user.username
 
-                        currentPredictions[x] = scoreAndName
+                        currentPredictions[x] = score_and_name
 
                         # write currentPredictionsClassList to a file
                         # with open('currentPredictionsClassList.list', 'wb') as currentPredictionsClassList_file:
@@ -387,10 +411,10 @@ async def user_prediction(ctx, score):
                         break
                 else:
                     # add new user & score to list
-                    # newUser is an object of UserAndScore class with name and currentPrediction inside
+                    # new_user is an object of UserAndScore class with name and currentPrediction inside
                     # (more attributes to be added & set to 0/null)
-                    newUser = UserAndScore(authorMentionName, authorTextName, score)
-                    currentUsersClassList.append(newUser)
+                    new_user = UserAndScore(author_mention_name, author_text_name, score)
+                    currentUsersClassList.append(new_user)
 
                     # write currentPredictionsClassList to a file
                     # with open('currentPredictionsClassList.list', 'wb') as currentPredictionsClassList_file:
@@ -400,8 +424,8 @@ async def user_prediction(ctx, score):
                     # json.dumps(currentUsersClassList, indent=2)
                     # json.dump(currentUsersClassList, f, indent=2)
 
-                    scoreAndName = newUser.currentPrediction + ' - ' + newUser.username
-                    currentPredictions.append(scoreAndName)
+                    score_and_name = new_user.currentPrediction + ' - ' + new_user.username
+                    currentPredictions.append(score_and_name)
 
                     # write currentPredictions to a file
                     with open('currentPredictions.list', 'wb') as currentPredictions_file:
@@ -409,7 +433,7 @@ async def user_prediction(ctx, score):
 
                     # currentPredictions = json.dumps("currentPredictions.json")
 
-                response = random.choice(correct_score_format) + authorMentionName + '!'
+                response = random.choice(correct_score_format) + author_mention_name + '!'
 
             else:
                 response = "Maybe try being a little more realistic!"
@@ -418,7 +442,9 @@ async def user_prediction(ctx, score):
     await ctx.send(response)
 
 
-@bot.command(name='clear-predictions')
+# At the moment, this function will clear the User Objects, so all current predictions and any scoreboard rating
+
+@bot.command(name='clear-predictions', help='Clear the users and predictions in memory')
 async def clear_predictions(ctx):
     currentUsersClassList.clear()
     currentPredictions.clear()
@@ -436,7 +462,7 @@ async def clear_predictions(ctx):
     await ctx.send('Files have been cleared')
 
 
-@bot.command(name='predictions', help='Shows all upcoming or current match predictions!')
+@bot.command(name='predictions', help='Show all upcoming or current match predictions!')
 async def current_predictions(ctx):
     # Test Values
     # predictions = [
