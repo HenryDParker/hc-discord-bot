@@ -38,7 +38,6 @@ class UserAndScore:
 
 # Global Lists
 currentUsersClassList = []
-currentPredictions = []
 
 # Global Dictionaries
 currentFixture = {}
@@ -65,12 +64,6 @@ channel_id = 917754145367289929
 scorePattern = re.compile('^[0-9]{1,2}-[0-9]{1,2}$')
 scorePatternHigh = re.compile('^[0-9]{1,5}-[0-9]{1,5}$')
 
-# try:
-#     with open('currentPredictionsClassList.list', 'rb') as currentPredictionsClassList_file:
-#         currentUsersClassList = pickle.load(currentPredictionsClassList_file)
-# except:
-#     currentUsersClassList = []
-
 try:
     # with open("file.json", 'r') as f:
     #     currentUsersClassList = json.loads(f)
@@ -78,20 +71,11 @@ try:
 except:
     currentUsersClassList = []
 
-try:
-    # with open('currentPredictions.list', 'rb') as currentPredictions_file:
-    #     currentPredictions = pickle.load(currentPredictions_file)
-
-    currentPredictions = json.loads("currentPredictions.json")
-except:
-    currentPredictions = []
-
 
 # Check fixture info every hour
 @tasks.loop(minutes=30)
 async def check_fixtures():
-    #    if datetime.now().hour == 14:
-    # API call to get team fixtures for 2021 Season
+    # API call to get team fixtures for current Season
     url_fixtures = "https://api-football-v1.p.rapidapi.com/v3/fixtures"
 
     # find today's date
@@ -249,7 +233,6 @@ async def check_next_fixture():
 
 @bot.event
 async def give_results():
-    # Channel ID is static as not sure how to pull Channel ID in code
     if bot_ready:
         channel = bot.get_channel(channel_id)
 
@@ -369,31 +352,25 @@ async def user_prediction(ctx, score):
                 author_text_name = format(ctx.message.author)
 
                 # for each UserAndScore object in List
-                for UserAndScoreObj in currentUsersClassList:
+                for each in currentUsersClassList:
                     # if User already exists in list
-                    if UserAndScoreObj.mentionName == author_mention_name:
+                    if each.mentionName == author_mention_name:
                         # update that user's current prediction
                         UserAndScore.currentPrediction = score
                         UserAndScore.mentionName = author_mention_name
+                        UserAndScore.username = author_text_name
+                        # Future Feature - for correct guesses/guess streak use:
+                        # UserAndScore.numCorrectPredictions = each.numCorrectPredictions
 
-                        x = currentUsersClassList.index(UserAndScoreObj)
-
+                        x = currentUsersClassList.index(each)
                         currentUsersClassList[x] = UserAndScore
-                        existing_user = UserAndScore(author_mention_name, author_text_name, score)
-                        score_and_name = existing_user.currentPrediction + ' - ' + existing_user.username
-
-                        currentPredictions[x] = score_and_name
 
                         # write currentPredictionsClassList to a file
                         # with open('currentPredictionsClassList.list', 'wb') as currentPredictionsClassList_file:
                         #     pickle.dump(currentUsersClassList, currentPredictionsClassList_file)
 
-                        # write currentPredictions to a file
-                        # with open('currentPredictions.list', 'wb') as currentPredictions_file:
-                        #     pickle.dump(currentPredictions, currentPredictions_file)
-
-                        response = '_Prediction updated_\n' + random.choice(
-                            correct_score_format) + author_mention_name + '!'
+                        response = '_Prediction updated_\n' + random.choice(correct_score_format)\
+                                   + author_mention_name + '!'
 
                         break
                 else:
@@ -411,15 +388,6 @@ async def user_prediction(ctx, score):
                     # json.dumps(currentUsersClassList, indent=2)
                     # json.dump(currentUsersClassList, f, indent=2)
 
-                    score_and_name = new_user.currentPrediction + ' - ' + new_user.username
-                    currentPredictions.append(score_and_name)
-
-                    # write currentPredictions to a file
-                    with open('currentPredictions.list', 'wb') as currentPredictions_file:
-                        pickle.dump(currentPredictions, currentPredictions_file)
-
-                    # currentPredictions = json.dumps("currentPredictions.json")
-
                     response = random.choice(correct_score_format) + author_mention_name + '!'
 
             else:
@@ -434,17 +402,11 @@ async def user_prediction(ctx, score):
 @bot.command(name='clear-predictions', help='Clear the users and predictions in memory')
 async def clear_predictions(ctx):
     currentUsersClassList.clear()
-    currentPredictions.clear()
 
     await ctx.send('Memory has been cleared')
 
     with open('currentPredictionsClassList.list', 'wb') as currentPredictionsClassList_file:
         pickle.dump(currentUsersClassList, currentPredictionsClassList_file)
-
-    with open('currentPredictions.list', 'wb') as currentPredictions_file:
-        pickle.dump(currentPredictions, currentPredictions_file)
-
-    # currentPredictions = json.dumps("currentPredictions.json")
 
     await ctx.send('Files have been cleared')
 
@@ -452,9 +414,12 @@ async def clear_predictions(ctx):
 @bot.command(name='predictions', help='Show all upcoming or current match predictions!')
 async def current_predictions(ctx):
 
-    # ----------------
-    # Create temporary currentPredictions list HERE from objects rather than globally
-    # ----------------
+    # Create temporary currentPredictions list from Objects rather than globally
+    current_predictions_list = []
+    for each in currentUsersClassList:
+        score_and_name = each.currentPrediction + ' - ' + each.username
+        current_predictions_list.append(score_and_name)
+
 
     home_team = nextFixture['teams']['home']['name']
     away_team = nextFixture['teams']['away']['name']
@@ -470,18 +435,18 @@ async def current_predictions(ctx):
         is_home = False
 
     # Combine attributes of each object in UserAndScore class into one string and add to new list
-    if not currentPredictions:
+    if not current_predictions_list:
         if is_home:
-            response = f'No score predictions for West Ham vs {away_team}, why not be the first!'
+            response = f'No score predictions for **West Ham vs {away_team}**, why not be the first!'
         else:
-            response = f'No score predictions for {home_team} vs West Ham, why not be the first!'
+            response = f'No score predictions for **{home_team} vs West Ham**, why not be the first!'
     else:
         if is_home:
-            response = f'Here are all the score predictions for West Ham vs {away_team}\n\n' \
-                       + '\n'.join(currentPredictions)
+            response = f'Here are all the score predictions for **West Ham vs {away_team}**\n\n' \
+                       + '\n'.join(current_predictions_list)
         else:
-            response = f'Here are all the score predictions for {home_team} vs West Ham\n\n' \
-                       + '\n'.join(currentPredictions)
+            response = f'Here are all the score predictions for **{home_team} vs West Ham**\n\n' \
+                       + '\n'.join(current_predictions_list)
     await ctx.send(response)
 
 
