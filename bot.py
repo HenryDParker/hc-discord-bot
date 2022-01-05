@@ -332,7 +332,7 @@ async def on_ready():
     await next_fixture()
 
 
-@bot.command(name='p', help='Submit your score prediction! e.g. !p 2-1')
+@bot.command(name='p', help='Submit (or update) your score prediction! e.g. !p 2-1')
 async def user_prediction(ctx, score):
     # get current time
     current_time = int(time.time())
@@ -351,29 +351,28 @@ async def user_prediction(ctx, score):
                 author_mention_name = format(ctx.message.author.mention)
                 author_text_name = format(ctx.message.author)
 
+                score_updated = False
                 # for each UserAndScore object in List
                 for each in currentUsersClassList:
                     # if User already exists in list
                     if each.mentionName == author_mention_name:
                         # update that user's current prediction
-                        UserAndScore.currentPrediction = score
-                        UserAndScore.mentionName = author_mention_name
-                        UserAndScore.username = author_text_name
-                        # Future Feature - for correct guesses/guess streak use:
-                        # UserAndScore.numCorrectPredictions = each.numCorrectPredictions
-
-                        x = currentUsersClassList.index(each)
-                        currentUsersClassList[x] = UserAndScore
+                        each.currentPrediction = score
 
                         # write currentPredictionsClassList to a file
                         # with open('currentPredictionsClassList.list', 'wb') as currentPredictionsClassList_file:
                         #     pickle.dump(currentUsersClassList, currentPredictionsClassList_file)
 
-                        response = '_Prediction updated_\n' + random.choice(correct_score_format)\
+                        # if this value is None, then prediction was reset from previous fixture
+                        # and no previous prediction for this fixture has occurred
+                        # to be used for Score Streak in Future Feature
+                        if each.currentPrediction is None:
+                            response = random.choice(correct_score_format) + author_mention_name + '!'
+                        else:
+                            response = '_Prediction updated_\n' + random.choice(correct_score_format)\
                                    + author_mention_name + '!'
-
-                        break
-                else:
+                        score_updated = True
+                if not score_updated:
                     # add new user & score to list
                     # new_user is an object of UserAndScore class with name and currentPrediction inside
                     # (more attributes to be added & set to 0/null)
@@ -405,10 +404,10 @@ async def clear_predictions(ctx):
 
     await ctx.send('Memory has been cleared')
 
-    with open('currentPredictionsClassList.list', 'wb') as currentPredictionsClassList_file:
-        pickle.dump(currentUsersClassList, currentPredictionsClassList_file)
+    # with open('currentPredictionsClassList.list', 'wb') as currentPredictionsClassList_file:
+    #     pickle.dump(currentUsersClassList, currentPredictionsClassList_file)
 
-    await ctx.send('Files have been cleared')
+    # await ctx.send('Files have been cleared')
 
 
 @bot.command(name='predictions', help='Show all upcoming or current match predictions!')
