@@ -87,11 +87,6 @@ except:
     currentPredictions = []
 
 
-# Option 2 Lists
-# currentScorePredictions = []
-# currentUserPredictions = []
-
-
 # Check fixture info every hour
 @tasks.loop(minutes=30)
 async def check_fixtures():
@@ -99,7 +94,7 @@ async def check_fixtures():
     # API call to get team fixtures for 2021 Season
     url_fixtures = "https://api-football-v1.p.rapidapi.com/v3/fixtures"
 
-    # find todays date
+    # find today's date
     today = date.today()
     # set the month to an int e.g. 02
     today_month = int(today.strftime("%m"))
@@ -111,7 +106,6 @@ async def check_fixtures():
         current_season = today_year - 1
     else:
         current_season = today_year
-
 
     querystring_fixtures = {"season": current_season, "team": "48"}
 
@@ -130,30 +124,28 @@ async def check_fixtures():
     with open('fixtures_dict_json.json', 'w') as f:
         json.dump(fixtures_dict_json, f)
 
-    # API call to get team info for 2021 Season
-    url_leagues = "https://api-football-v1.p.rapidapi.com/v3/leagues"
-
-    querystring_leagues = {
-        "season": current_season,
-        "team": "48"
-    }
-
-    headers_leagues = {
-        'x-rapidapi-host': "api-football-v1.p.rapidapi.com",
-        'x-rapidapi-key': RAPIDAPIKEY
-    }
-
-    api_response = requests.request("GET", url_leagues, headers=headers_leagues, params=querystring_leagues)
-    data = api_response.text
-    leagues_dict_json = json.loads(data)
-
-    # with open('leagues_dict_json.json', 'wb') as leagues_dict_json_file:
-    #     pickle.dump(leagues_dict_json, leagues_dict_json_file)
-
-    with open('leagues_dict_json.json', 'w') as f:
-        json.dump(leagues_dict_json, f)
-
-
+    # # API call to get team info for 2021 Season
+    # url_leagues = "https://api-football-v1.p.rapidapi.com/v3/leagues"
+    #
+    # querystring_leagues = {
+    #     "season": current_season,
+    #     "team": "48"
+    # }
+    #
+    # headers_leagues = {
+    #     'x-rapidapi-host': "api-football-v1.p.rapidapi.com",
+    #     'x-rapidapi-key': RAPIDAPIKEY
+    # }
+    #
+    # api_response = requests.request("GET", url_leagues, headers=headers_leagues, params=querystring_leagues)
+    # data = api_response.text
+    # leagues_dict_json = json.loads(data)
+    #
+    # # with open('leagues_dict_json.json', 'wb') as leagues_dict_json_file:
+    # #     pickle.dump(leagues_dict_json, leagues_dict_json_file)
+    #
+    # with open('leagues_dict_json.json', 'w') as f:
+    #     json.dump(leagues_dict_json, f)
 
 
 # looping every minute for testing purposes
@@ -255,7 +247,6 @@ async def check_next_fixture():
                 continue
 
 
-
 @bot.event
 async def give_results():
     # Channel ID is static as not sure how to pull Channel ID in code
@@ -290,7 +281,7 @@ async def give_results():
                         away_score_pens = (each['score']['penalty']['away'])
                         # Full fixture result with team names (and penalties)
                         fixture_result_full = f'{home_team} {str(home_score)} ({str(home_score_pens)})' \
-                                         f' - {str(away_score)} ({str(away_score_pens)}) {away_team}'
+                                              f' - {str(away_score)} ({str(away_score_pens)}) {away_team}'
                         # Short fixture result for prediction comparison  (NOT including penalties at the moment)
                         fixture_result_score = f'{str(home_score)}-{str(away_score)}'
 
@@ -346,8 +337,6 @@ async def next_fixture():
         await channel.send(response)
 
 
-
-
 # When the bot joins a server
 @bot.event
 async def on_ready():
@@ -360,28 +349,6 @@ async def on_ready():
     await next_fixture()
 
 
-# # Api-Football Statistics based on team id
-# @bot.command(name='massive', help='Who is absolutely massive?')
-# async def massive(ctx):
-#     url = "https://api-football-v1.p.rapidapi.com/v3/teams/statistics"
-#
-#     querystring = {"league": "39", "season": "2021", "team": "48"}
-#
-#     headers = {
-#         'x-rapidapi-host': "api-football-v1.p.rapidapi.com",
-#         'x-rapidapi-key': RAPIDAPIKEY
-#     }
-#
-#     api_response = requests.request("GET", url, headers=headers, params=querystring)
-#     data = api_response.text
-#     response_dict_json = json.loads(data)
-#     team_name = str(response_dict_json['response']['team']['name'])
-#
-#     response = team_name + ' are absolutely massive'
-#
-#     await ctx.send(response)
-
-
 @bot.command(name='p', help='Submit your score prediction! e.g. !p 2-1')
 async def user_prediction(ctx, score):
     # get current time
@@ -392,8 +359,9 @@ async def user_prediction(ctx, score):
     if fixture_time - current_time <= 0 or matchInProgress:
         response = "Sorry, you're too late!\nThe match has already started!"
     else:
+        # remove whitespace from prediction
         score.translate({ord(c): None for c in string.whitespace})
-
+        # match score to defined regex patterns
         if scorePatternHigh.match(score):
             if scorePattern.match(score):
                 # find user that sent command
@@ -424,7 +392,8 @@ async def user_prediction(ctx, score):
                         # with open('currentPredictions.list', 'wb') as currentPredictions_file:
                         #     pickle.dump(currentPredictions, currentPredictions_file)
 
-                        response = 'Prediction updated\n' + random.choice(correct_score_format) + author_mention_name + '!'
+                        response = '_Prediction updated_\n' + random.choice(
+                            correct_score_format) + author_mention_name + '!'
 
                         break
                 else:
@@ -482,15 +451,10 @@ async def clear_predictions(ctx):
 
 @bot.command(name='predictions', help='Show all upcoming or current match predictions!')
 async def current_predictions(ctx):
-    # Test Values
-    # predictions = [
-    #     '1-0 - RealCat',
-    #     '1-1 - Hammers4life',
-    #     '1-0 - Gonzo',
-    #     '2-2 - Geo',
-    # ]
-    # # put all values in list into "response" string separated by a new line "\n"
-    # response = 'Here are all the predictions vs Chelsea\n\n' + '\n'.join(predictions)
+
+    # ----------------
+    # Create temporary currentPredictions list HERE from objects rather than globally
+    # ----------------
 
     home_team = nextFixture['teams']['home']['name']
     away_team = nextFixture['teams']['away']['name']
@@ -513,10 +477,10 @@ async def current_predictions(ctx):
             response = f'No score predictions for {home_team} vs West Ham, why not be the first!'
     else:
         if is_home:
-            response = f'Here are all the score predictions for West Ham vs {away_team}\n\n'\
+            response = f'Here are all the score predictions for West Ham vs {away_team}\n\n' \
                        + '\n'.join(currentPredictions)
         else:
-            response = f'Here are all the score predictions for {home_team} vs West Ham\n\n'\
+            response = f'Here are all the score predictions for {home_team} vs West Ham\n\n' \
                        + '\n'.join(currentPredictions)
     await ctx.send(response)
 
@@ -567,7 +531,7 @@ async def leaderboard(ctx):
 #
 #         #all_league_names = all_league_names + league_name
 #     all_league_names = ''.join(short_leagues_list)
-#     response = 'West Ham are in the following leagues: ' + all_league_names
+#     response = 'West Ham are in the following competitions: ' + all_league_names
 #
 #     #Number of leagues
 #     #number_of_leagues = str(response_dict_json['results'])
