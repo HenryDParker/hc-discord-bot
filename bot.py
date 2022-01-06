@@ -9,6 +9,7 @@ import re
 import requests
 import time
 
+from github import Github
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
 from datetime import date
@@ -21,6 +22,7 @@ load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 # GUILD = os.getenv('DISCORD_GUILD')
 RAPIDAPIKEY = os.getenv('RAPIDAPI_KEY')
+GITHUBTOKEN = os.getenv('GITHUB_TOKEN')
 
 # client = discord.Client()
 # define bot command decorator
@@ -66,12 +68,12 @@ channel_id = 917754145367289929
 scorePattern = re.compile('^[0-9]{1,2}-[0-9]{1,2}$')
 scorePatternHigh = re.compile('^[0-9]{1,5}-[0-9]{1,5}$')
 
-try:
-    # with open("file.json", 'r') as f:
-    #     currentUsersClassList = json.loads(f)
-    currentUsersClassList = json.loads("file.json")
-except:
-    currentUsersClassList = []
+# try:
+#     # with open("file.json", 'r') as f:
+#     #     currentUsersClassList = json.loads(f)
+#     currentUsersClassList = json.loads("file.json")
+# except:
+#     currentUsersClassList = []
 
 
 # Check fixture info every hour
@@ -333,7 +335,10 @@ async def on_ready():
     channel = bot.get_channel(channel_id)
     results = f'{bot.user.name} has connected to Discord!'
     bot_ready = True
-    await read_from_file()
+    try:
+        await read_from_file()
+    except:
+        currentUsersClassList = []
     await channel.send(results)
     await next_fixture()
 
@@ -411,6 +416,7 @@ async def user_prediction(ctx, score):
 
 
 async def save_to_file():
+    # create "data" and save all objects in currentUsersClassList in a nested dict
     data = {}
     data['Users'] = []
     for each in currentUsersClassList:
@@ -421,20 +427,60 @@ async def save_to_file():
             'numCorrectPredictions': each.numCorrectPredictions
         })
 
+    # perform local write (NO READ) for testing purposes
     with open('users.json', 'w') as outfile:
         json.dump(data, outfile, indent=2)
 
+    # convert "data" to a json_string and send this to 'hc-bot-memory' repo on GitHub for backup
+    json_string = json.dumps(data)
+    github = Github(GITHUBTOKEN)
+    repository = github.get_user().get_repo('hc-bot-memory')
+    filename = 'users.json'
+    contents = repository.get_contents("")
+    all_files = []
+
+    # check all values in contents
+    while contents:
+        # take first value as file_content
+        file_content = contents.pop(0)
+        # if file_content is a directory (shouldn't ever be)
+        if file_content.type == "dir":
+            contents.extend(repository.get_contents(file_content.path))
+        # else must be a file
+        else:
+            file = file_content
+            # remove extra text to create clean file name for comparison
+            all_files.append(str(file).replace('ContentFile(path="', '').replace('")', ''))
+
+    # check if filename matches in all_files list - if yes then update, if no then create
+    if filename in all_files:
+        contents = repository.get_contents(filename)
+        repository.update_file(filename, "Updated predictions file", json_string, contents.sha)
+    else:
+        repository.create_file(filename, "Created predictions file", json_string)
+
+
 
 async def read_from_file():
-    with open('users.json') as json_file:
-        data = json.load(json_file)
+    try:
+        # download file from Github repo 'hc-bot-memory' and decode to json_string
+        github = Github(GITHUBTOKEN)
+        repository = github.get_user().get_repo('hc-bot-memory')
+        filename = 'users.json'
+        file = repository.get_contents(filename)
+        json_string = file.decoded_content.decode()
+        # convert json_string to "data", nested dict
+        data = json.loads(json_string)
+        # set "data" to currentUsersClassList
         for each in data['Users']:
             new_user = UserAndScore(each['mentionName'],
                                     each['username'],
                                     each['currentPrediction'],
                                     each['numCorrectPredictions'])
             currentUsersClassList.append(new_user)
-
+    # if fail due to empty file, clear currentUsersClassList to an empty list
+    except json.decoder.JSONDecodeError:
+        currentUsersClassList.clear()
 
 # At the moment, this function will clear the User Objects, so all current predictions and any scoreboard rating
 
@@ -444,9 +490,7 @@ async def clear_predictions(ctx):
 
     await ctx.send('Memory has been cleared')
 
-    data = {}
-    with open('users.json', 'w') as outfile:
-        json.dump(data, outfile, indent=2)
+    await save_to_file()
 
     await ctx.send('Files have been cleared')
 
