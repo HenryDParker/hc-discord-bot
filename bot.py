@@ -12,6 +12,7 @@ import time
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
 from datetime import date
+from json import JSONEncoder
 
 # URL to invite bot
 # https://discord.com/api/oauth2/authorize?client_id=917479797242875936&permissions=274878114880&scope=bot
@@ -28,13 +29,14 @@ bot = commands.Bot(command_prefix='!')
 
 # Set up UserAndScore class
 class UserAndScore:
-    def __init__(self, mentionName, username, currentPrediction):
+    def __init__(self, mentionName, username, currentPrediction, numCorrectPredictions):
         self.mentionName = mentionName
         self.username = username
         self.currentPrediction = currentPrediction
-        # self.numCorrectPredictions = numCorrectPredictions
+        self.numCorrectPredictions = numCorrectPredictions
         # self.leaderboardPosition = leaderboardPosition
-
+        # self.predictionStreak = predictionStreak
+        # self.previousPredictionCorrect = previousPredictionCorrect
 
 # Global Lists
 currentUsersClassList = []
@@ -276,6 +278,9 @@ async def give_results():
                 if each.currentPrediction == fixture_result_score:
                     correct_prediction_user_mention = each.mentionName
                     correct_prediction_list.append(correct_prediction_user_mention)
+                    # increment correct predictions tally for "each" when correct
+                    each.numCorrectPredictions += 1
+
             # Check if list is empty (no correct guesses) and print a response accordingly
             # --- unsure whether this is the correct pythonic way to check empty list
             # if correct_prediction_list is None:
@@ -328,6 +333,7 @@ async def on_ready():
     channel = bot.get_channel(channel_id)
     results = f'{bot.user.name} has connected to Discord!'
     bot_ready = True
+    await read_from_file()
     await channel.send(results)
     await next_fixture()
 
@@ -351,7 +357,8 @@ async def user_prediction(ctx, score):
                 author_mention_name = format(ctx.message.author.mention)
                 author_text_name = format(ctx.message.author)
 
-                score_updated = False
+                score_added = False
+                # Check if user already has a predictions - if yes, update it
                 # for each UserAndScore object in List
                 for each in currentUsersClassList:
                     # if User already exists in list
@@ -359,9 +366,14 @@ async def user_prediction(ctx, score):
                         # update that user's current prediction
                         each.currentPrediction = score
 
+
+
                         # write currentPredictionsClassList to a file
                         # with open('currentPredictionsClassList.list', 'wb') as currentPredictionsClassList_file:
                         #     pickle.dump(currentUsersClassList, currentPredictionsClassList_file)
+
+                        await save_to_file()
+
 
                         # if this value is None, then prediction was reset from previous fixture
                         # and no previous prediction for this fixture has occurred
@@ -371,29 +383,57 @@ async def user_prediction(ctx, score):
                         else:
                             response = '_Prediction updated_\n' + random.choice(correct_score_format)\
                                    + author_mention_name + '!'
-                        score_updated = True
-                if not score_updated:
+                        score_added = True
+                if not score_added:
                     # add new user & score to list
                     # new_user is an object of UserAndScore class with name and currentPrediction inside
                     # (more attributes to be added & set to 0/null)
-                    new_user = UserAndScore(author_mention_name, author_text_name, score)
+                    new_user = UserAndScore(author_mention_name, author_text_name, score, 0)
                     currentUsersClassList.append(new_user)
 
+                    await save_to_file()
                     # write currentPredictionsClassList to a file
                     # with open('currentPredictionsClassList.list', 'wb') as currentPredictionsClassList_file:
                     #     pickle.dump(currentUsersClassList, currentPredictionsClassList_file)
+
 
                     # with open("file.json", "w") as f:
                     # json.dumps(currentUsersClassList, indent=2)
                     # json.dump(currentUsersClassList, f, indent=2)
 
                     response = random.choice(correct_score_format) + author_mention_name + '!'
-
             else:
                 response = "Maybe try being a little more realistic!"
         else:
             response = "Please structure your prediction correctly e.g. 1-0 "
+    # ignore this error - not possible to return a blank response due to use of boolean "score_added"
     await ctx.send(response)
+
+
+async def save_to_file():
+    data = {}
+    data['Users'] = []
+    for each in currentUsersClassList:
+        data['Users'].append({
+            'mentionName': each.mentionName,
+            'username': each.username,
+            'currentPrediction': each.currentPrediction,
+            'numCorrectPredictions': each.numCorrectPredictions
+        })
+
+    with open('users.json', 'w') as outfile:
+        json.dump(data, outfile, indent=2)
+
+
+async def read_from_file():
+    with open('users.json') as json_file:
+        data = json.load(json_file)
+        for each in data['Users']:
+            new_user = UserAndScore(each['mentionName'],
+                                    each['username'],
+                                    each['currentPrediction'],
+                                    each['numCorrectPredictions'])
+            currentUsersClassList.append(new_user)
 
 
 # At the moment, this function will clear the User Objects, so all current predictions and any scoreboard rating
@@ -404,10 +444,11 @@ async def clear_predictions(ctx):
 
     await ctx.send('Memory has been cleared')
 
-    # with open('currentPredictionsClassList.list', 'wb') as currentPredictionsClassList_file:
-    #     pickle.dump(currentUsersClassList, currentPredictionsClassList_file)
+    data = {}
+    with open('users.json', 'w') as outfile:
+        json.dump(data, outfile, indent=2)
 
-    # await ctx.send('Files have been cleared')
+    await ctx.send('Files have been cleared')
 
 
 @bot.command(name='predictions', help='Show all upcoming or current match predictions!')
