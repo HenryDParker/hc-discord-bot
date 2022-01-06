@@ -11,3 +11,4 @@ python-dotenv==0.19.2
 requests==2.26.0
 typing_extensions==4.0.1
 yarl==1.7.2
+PyGithub~=1.55
