@@ -4,6 +4,7 @@ import os
 import random
 import string
 import re
+import discord
 import requests
 import time
 import datetime
@@ -24,8 +25,10 @@ GITHUBTOKEN = os.getenv('GITHUB_TOKEN')
 
 # client = discord.Client()
 # define bot command decorator
-bot = commands.Bot(command_prefix='!')
+bot = commands.Bot(command_prefix='>')
 
+# Remove default help command
+bot.remove_command("help")
 
 # Set up UserAndScore class
 class UserAndScore:
@@ -82,6 +85,8 @@ scorePattern = re.compile('^[0-9]{1,2}-[0-9]{1,2}$')
 scorePatternHigh = re.compile('^[0-9]{1,5}-[0-9]{1,5}$')
 
 
+# Channel assignment, storage and backup
+# ----------------------------------------------------------------------------------------------------------------------
 @bot.command(name='channel', help='Admin Only - Assign the channel that this bot will operate in')
 @commands.has_permissions(administrator=True)
 async def which_channel(ctx):
@@ -143,8 +148,12 @@ async def read_channel_backup():
         test_server_id = bot.get_channel(917754145367289929)
         response = "This bot has failed to read the channel backup from Github <@110010452045467648> "
         await test_server_id.send(response)
+# ----------------------------------------------------------------------------------------------------------------------
 
 
+
+# Timed tasks
+# ----------------------------------------------------------------------------------------------------------------------
 # Check fixture info every hour
 @tasks.loop(minutes=30)
 async def check_fixtures():
@@ -312,6 +321,8 @@ async def check_next_fixture():
                     matchInProgress = False
                 continue
 
+# ----------------------------------------------------------------------------------------------------------------------
+
 
 @bot.event
 async def give_results():
@@ -431,6 +442,58 @@ async def on_ready():
     await next_fixture()
 
 
+
+# Bot help section
+# ----------------------------------------------------------------------------------------------------------------------
+@bot.group(invoke_without_command=True)
+async def help(ctx):
+    em = discord.Embed(title="Help", description="Use >help *command* for extended information",
+                       colour=discord.Colour.from_rgb(129, 19, 49))
+
+    em.add_field(name="Commands", value="**>p** - Add or update your score prediction\n"
+                                        "**>leaderboard** - Show the current leaderboard of predictors\n"
+                                        "**>correct-scores** - Your total number of correct scores\n"
+                                        "**>score-streak** - Your current number of correct scores in a row\n")
+    await ctx.send(embed=em)
+
+
+
+@help.command(name="p")
+async def p(ctx):
+    em = discord.Embed(title="p", description="Add or update you score prediction for the next match",
+                       colour=discord.Colour.from_rgb(129, 19, 49))
+    em.add_field(name="*Syntax*", value=">p *homescore*-*awayscore*")
+    await ctx.send(embed=em)
+
+
+
+@help.command(name="leaderboard")
+async def leaderboard(ctx):
+    em = discord.Embed(title="leaderboard", description="Show the current leaderboard of the top score predictors",
+                       colour=discord.Colour.from_rgb(129, 19, 49))
+    await ctx.send(embed=em)
+
+
+
+@help.command(name="correct-scores")
+async def correct_scores(ctx):
+    em = discord.Embed(title="correct-scores", description="Show your total number of correct score predictions",
+                       colour=discord.Colour.from_rgb(129, 19, 49))
+    await ctx.send(embed=em)
+
+
+
+@help.command(name="score-streak")
+async def score_streak(ctx):
+    em = discord.Embed(title="score-streak", description="Show your current number of correct score predictions"
+                                                         " in a row",
+                       colour=discord.Colour.from_rgb(129, 19, 49))
+    await ctx.send(embed=em)
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+# User commands
+# ----------------------------------------------------------------------------------------------------------------------
 @bot.command(name='p', help='Submit (or update) your score prediction! e.g. !p 2-1')
 async def user_prediction(ctx, score):
     global predictions_updated
@@ -459,6 +522,7 @@ async def user_prediction(ctx, score):
                     if each.mentionName == author_mention_name:
                         # update that user's current prediction
                         each.currentPrediction = score
+                        each.username = author_text_name
 
                         # write currentPredictionsClassList to a file
                         # with open('currentPredictionsClassList.list', 'wb') as currentPredictionsClassList_file:
@@ -503,6 +567,7 @@ async def user_prediction(ctx, score):
     await ctx.send(response)
 
 
+
 @bot.command(name='correct-scores', help='Check your total number of correct guesses!')
 async def score_streak(ctx):
     author_mention_name = format(ctx.message.author.mention)
@@ -517,6 +582,7 @@ async def score_streak(ctx):
                 response = f'You have correctly predicted {each.numCorrectPredictions} result(s).'
             break
     await ctx.send(response)
+
 
 
 @bot.command(name='score-streak', help='Check your current number of correct guesses in a row!')
@@ -538,6 +604,102 @@ async def score_streak(ctx):
 
 
 
+@bot.command(name='predictions', help='Show all upcoming or current match predictions!')
+async def current_predictions(ctx):
+    # Create temporary currentPredictions list from Objects rather than globally
+    current_predictions_list = []
+    for each in currentUsersClassList:
+        score_and_name = each.currentPrediction + ' - ' + each.username
+        current_predictions_list.append(score_and_name)
+
+    home_team = nextFixture['teams']['home']['name']
+    away_team = nextFixture['teams']['away']['name']
+
+    if matchInProgress:
+        home_team = currentFixture['teams']['home']['name']
+        away_team = currentFixture['teams']['away']['name']
+
+    # Is the match at Home or Away
+    if home_team == 'West Ham':
+        is_home = True
+    else:
+        is_home = False
+
+    # Combine attributes of each object in UserAndScore class into one string and add to new list
+    if not current_predictions_list:
+        if is_home:
+            response = f'No score predictions for **West Ham vs {away_team}**, why not be the first!'
+        else:
+            response = f'No score predictions for **{home_team} vs West Ham**, why not be the first!'
+    else:
+        if is_home:
+            response = f'Here are all the score predictions for **West Ham vs {away_team}**\n\n' \
+                       + '\n'.join(current_predictions_list)
+        else:
+            response = f'Here are all the score predictions for **{home_team} vs West Ham**\n\n' \
+                       + '\n'.join(current_predictions_list)
+    await ctx.send(response)
+
+
+
+@bot.command(name='leaderboard', help='Shows top score predictors!')
+async def leaderboard(ctx):
+    unsorted_leaderboard_dict = {}
+    for each in currentUsersClassList:
+        correct_predictions = each.numCorrectPredictions
+        username = each.username
+        unsorted_leaderboard_dict[username] = correct_predictions
+
+    leaderboard_dict = {}
+    sorted_key = sorted(unsorted_leaderboard_dict, key=unsorted_leaderboard_dict.get, reverse=True)
+    for x in sorted_key:
+        leaderboard_dict[x] = unsorted_leaderboard_dict[x]
+
+    # Option 1 - Format response into a table using monospaced code block only
+    # response = ("\n\n**Top Predictions Leaderboard**" +
+    #            "\n\n```Correct Scores |  Username"
+    #            "\n---------------+------------------------"
+    #            "\n" + "\n".join("\t  {}\t\t|  {}".format(v, k) for k, v in leaderboard_dict.items()) + "```")
+
+    # await ctx.send(response)
+
+    # Option 2 - Format response into a table using Embed & monospaced code block
+    leaderboard_string = ("```" + "\n".join("  {}  |  {}".format(v, k) for k, v in leaderboard_dict.items()) + "```")
+
+    embed = discord.Embed(title="Top Predictors Leaderboard", colour=discord.Colour.from_rgb(129, 19, 49))
+    embed.add_field(name="Correct Predictions", value=leaderboard_string)
+
+    await ctx.send(embed=embed)
+
+    # To sort out double digit correct predictions
+    # maybe add a white space to single digit values to match spacing of double digit values?
+
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+
+# Admin Tools
+# ----------------------------------------------------------------------------------------------------------------------
+@bot.command(name='admintest', help='Admin Only - Tells you if you have admin rights')
+@commands.has_permissions(administrator=True)
+async def admintest(ctx):
+    await ctx.send('You have admin rights')
+
+
+
+# At the moment, this function will clear the User Objects, so all current predictions and any scoreboard rating
+@bot.command(name='clear-users',
+             help='Admin Only - Clear ALL the users, predictions and their history in memory - use with caution')
+@commands.has_permissions(administrator=True)
+async def clear_users(ctx):
+    currentUsersClassList.clear()
+    await ctx.send('Memory has been cleared')
+
+    await save_to_file()
+    await ctx.send('Files have been cleared')
+
+
+
 @bot.command(name='force-backup', help='Admin Only - Force a file backup of the users')
 @commands.has_permissions(administrator=True)
 async def force_backup(ctx):
@@ -545,6 +707,9 @@ async def force_backup(ctx):
     await ctx.send('Users backed up to file')
 
 
+
+# Writing and reading Users to Github as storage
+# ----------------------------------------------------------------------------------------------------------------------
 async def save_to_file():
     # create "data" and save all objects in currentUsersClassList in a nested dict
     data = {'Users': []}
@@ -615,85 +780,9 @@ async def read_from_file():
     # if fail due to empty file, clear currentUsersClassList to an empty list
     except json.decoder.JSONDecodeError:
         currentUsersClassList.clear()
+# ----------------------------------------------------------------------------------------------------------------------
 
 
-# At the moment, this function will clear the User Objects, so all current predictions and any scoreboard rating
-
-@bot.command(name='clear-users',
-             help='Admin Only - Clear ALL the users, predictions and their history in memory - use with caution')
-@commands.has_permissions(administrator=True)
-async def clear_users(ctx):
-    currentUsersClassList.clear()
-
-    await ctx.send('Memory has been cleared')
-
-    await save_to_file()
-
-    await ctx.send('Files have been cleared')
-
-@bot.command(name='admintest', help='Admin Only - Tells you if you have admin rights')
-@commands.has_permissions(administrator=True)
-async def admintest(ctx):
-    await ctx.send('You have admin rights')
-
-
-@bot.command(name='predictions', help='Show all upcoming or current match predictions!')
-async def current_predictions(ctx):
-    # Create temporary currentPredictions list from Objects rather than globally
-    current_predictions_list = []
-    for each in currentUsersClassList:
-        score_and_name = each.currentPrediction + ' - ' + each.username
-        current_predictions_list.append(score_and_name)
-
-    home_team = nextFixture['teams']['home']['name']
-    away_team = nextFixture['teams']['away']['name']
-
-    if matchInProgress:
-        home_team = currentFixture['teams']['home']['name']
-        away_team = currentFixture['teams']['away']['name']
-
-    # Is the match at Home or Away
-    if home_team == 'West Ham':
-        is_home = True
-    else:
-        is_home = False
-
-    # Combine attributes of each object in UserAndScore class into one string and add to new list
-    if not current_predictions_list:
-        if is_home:
-            response = f'No score predictions for **West Ham vs {away_team}**, why not be the first!'
-        else:
-            response = f'No score predictions for **{home_team} vs West Ham**, why not be the first!'
-    else:
-        if is_home:
-            response = f'Here are all the score predictions for **West Ham vs {away_team}**\n\n' \
-                       + '\n'.join(current_predictions_list)
-        else:
-            response = f'Here are all the score predictions for **{home_team} vs West Ham**\n\n' \
-                       + '\n'.join(current_predictions_list)
-    await ctx.send(response)
-
-
-@bot.command(name='leaderboard', help='Shows top score predictors!')
-async def leaderboard(ctx):
-    unsorted_leaderboard_dict = {}
-    for each in currentUsersClassList:
-        correct_predictions = each.numCorrectPredictions
-        username = each.username
-        unsorted_leaderboard_dict[username] = correct_predictions
-
-    leaderboard_dict = {}
-    sorted_key = sorted(unsorted_leaderboard_dict, key=unsorted_leaderboard_dict.get, reverse=True)
-    for x in sorted_key:
-        leaderboard_dict[x] = unsorted_leaderboard_dict[x]
-
-    # Format response into a table
-    response = ("\n\n**Top Predictions Leaderboard**" +
-                "\n\n```Correct Scores |  Username"
-                "\n---------------+------------------------"
-                "\n" + "\n".join("\t  {}\t\t|  {}".format(v, k) for k, v in leaderboard_dict.items()) + "```")
-
-    await ctx.send(response)
 
 
 # #Api-Football - Leagues by team ID & season
@@ -744,7 +833,8 @@ async def leaderboard(ctx):
 #
 #     await ctx.send(response)
 
-
+# Bot Error testing
+# ----------------------------------------------------------------------------------------------------------------------
 # on error, write to err.log
 @bot.event
 async def on_error(event, *args, **kwargs):
@@ -753,6 +843,7 @@ async def on_error(event, *args, **kwargs):
             f.write(f'Unhandled message: {args[0]}\n')
         else:
             raise
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 check_fixtures.start()
