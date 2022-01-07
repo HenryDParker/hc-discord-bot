@@ -25,10 +25,12 @@ GITHUBTOKEN = os.getenv('GITHUB_TOKEN')
 
 # client = discord.Client()
 # define bot command decorator
-bot = commands.Bot(command_prefix='>')
+command_prefix = '>'
+bot = commands.Bot(command_prefix=command_prefix)
 
 # Remove default help command
 bot.remove_command("help")
+
 
 # Set up UserAndScore class
 class UserAndScore:
@@ -148,8 +150,9 @@ async def read_channel_backup():
         test_server_id = bot.get_channel(917754145367289929)
         response = "This bot has failed to read the channel backup from Github <@110010452045467648> "
         await test_server_id.send(response)
-# ----------------------------------------------------------------------------------------------------------------------
 
+
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 # Timed tasks
@@ -321,6 +324,7 @@ async def check_next_fixture():
                     matchInProgress = False
                 continue
 
+
 # ----------------------------------------------------------------------------------------------------------------------
 
 
@@ -405,9 +409,10 @@ async def give_results():
 async def next_fixture():
     if bot_ready:
         # Grab details for next match
-
         next_home_team = nextFixture['teams']['home']['name']
         next_away_team = nextFixture['teams']['away']['name']
+        competition = nextFixture['league']['name']
+        competition_round = nextFixture['league']['round']
 
         if next_home_team == 'West Ham':
             is_home = True
@@ -415,9 +420,14 @@ async def next_fixture():
             is_home = False
 
         if is_home:
-            response = f'The next fixture is **West Ham vs {next_away_team}**\nGet your predictions in now using _!p_\n'
+            response = f'The next fixture is **West Ham vs {next_away_team}**' \
+                       f' in the {competition} ({competition_round})\n' \
+                       f'Get your predictions in now using {command_prefix}p\n'
         else:
-            response = f'The next fixture is **{next_home_team} vs West Ham**\nGet your predictions in now using _!p_\n'
+            response = f'The next fixture is **{next_home_team} vs West Ham**' \
+                       f' in the {competition} ({competition_round})' \
+                       f'\nGet your predictions in now using {command_prefix}p\n'
+
         for each in discord_channels:
             this_channel = bot.get_channel(discord_channels[each])
             await this_channel.send(response)
@@ -442,29 +452,27 @@ async def on_ready():
     await next_fixture()
 
 
-
 # Bot help section
 # ----------------------------------------------------------------------------------------------------------------------
 @bot.group(invoke_without_command=True)
 async def help(ctx):
-    em = discord.Embed(title="Help", description="Use >help *command* for extended information",
+    em = discord.Embed(title="Help", description=f"Use {command_prefix}help *command* for extended information",
                        colour=discord.Colour.from_rgb(129, 19, 49))
 
-    em.add_field(name="Commands", value="**>p** - Add or update your score prediction\n"
-                                        "**>leaderboard** - Show the current leaderboard of predictors\n"
-                                        "**>correct-scores** - Your total number of correct scores\n"
-                                        "**>score-streak** - Your current number of correct scores in a row\n")
+    em.add_field(name="Commands",
+                 value=f"**{command_prefix}p** - Add or update your score prediction\n"
+                       f"**{command_prefix}leaderboard** - Show the current leaderboard of predictors\n"
+                       f"**{command_prefix}correct-scores** - Your total number of correct scores\n"
+                       f"**{command_prefix}score-streak** - Your current number of correct scores in a row\n")
     await ctx.send(embed=em)
-
 
 
 @help.command(name="p")
 async def p(ctx):
     em = discord.Embed(title="p", description="Add or update you score prediction for the next match",
                        colour=discord.Colour.from_rgb(129, 19, 49))
-    em.add_field(name="*Syntax*", value=">p *homescore*-*awayscore*")
+    em.add_field(name="*Syntax*", value=f"{command_prefix}p *homescore*-*awayscore*")
     await ctx.send(embed=em)
-
 
 
 @help.command(name="leaderboard")
@@ -474,13 +482,11 @@ async def leaderboard(ctx):
     await ctx.send(embed=em)
 
 
-
 @help.command(name="correct-scores")
 async def correct_scores(ctx):
     em = discord.Embed(title="correct-scores", description="Show your total number of correct score predictions",
                        colour=discord.Colour.from_rgb(129, 19, 49))
     await ctx.send(embed=em)
-
 
 
 @help.command(name="score-streak")
@@ -489,12 +495,14 @@ async def score_streak(ctx):
                                                          " in a row",
                        colour=discord.Colour.from_rgb(129, 19, 49))
     await ctx.send(embed=em)
+
+
 # ----------------------------------------------------------------------------------------------------------------------
 
 
 # User commands
 # ----------------------------------------------------------------------------------------------------------------------
-@bot.command(name='p', help='Submit (or update) your score prediction! e.g. !p 2-1')
+@bot.command(name='p', help=f'Submit (or update) your score prediction! e.g. {command_prefix}p 2-1')
 async def user_prediction(ctx, score):
     global predictions_updated
     # get current time
@@ -567,7 +575,6 @@ async def user_prediction(ctx, score):
     await ctx.send(response)
 
 
-
 @bot.command(name='correct-scores', help='Check your total number of correct guesses!')
 async def score_streak(ctx):
     author_mention_name = format(ctx.message.author.mention)
@@ -582,7 +589,6 @@ async def score_streak(ctx):
                 response = f'You have correctly predicted {each.numCorrectPredictions} result(s).'
             break
     await ctx.send(response)
-
 
 
 @bot.command(name='score-streak', help='Check your current number of correct guesses in a row!')
@@ -603,7 +609,6 @@ async def score_streak(ctx):
     await ctx.send(response)
 
 
-
 @bot.command(name='predictions', help='Show all upcoming or current match predictions!')
 async def current_predictions(ctx):
     # Create temporary currentPredictions list from Objects rather than globally
@@ -615,11 +620,13 @@ async def current_predictions(ctx):
     home_team = nextFixture['teams']['home']['name']
     away_team = nextFixture['teams']['away']['name']
     competition = nextFixture['league']['name']
-    round = nextFixture['league']['round']
+    competition_round = nextFixture['league']['round']
 
     if matchInProgress:
         home_team = currentFixture['teams']['home']['name']
         away_team = currentFixture['teams']['away']['name']
+        competition = nextFixture['league']['name']
+        competition_round = nextFixture['league']['round']
 
     # Is the match at Home or Away
     if home_team == 'West Ham':
@@ -644,9 +651,11 @@ async def current_predictions(ctx):
 
     if not current_predictions_list:
         if is_home:
-            response = f'No score predictions for *West Ham vs {away_team}*\nin the {competition} ({round}), why not be the first!'
+            response = f'No score predictions for *West Ham vs {away_team}*\n' \
+                       f'in the {competition} ({competition_round}), why not be the first!'
         else:
-            response = f'No score predictions for *{home_team} vs West Ham*\nin the {competition} ({round}), why not be the first!'
+            response = f'No score predictions for *{home_team} vs West Ham*\n' \
+                       f'in the {competition} ({competition_round}), why not be the first!'
 
         embed = discord.Embed(title=response, colour=discord.Colour.from_rgb(129, 19, 49))
         embed.add_field(name="Current Predictions", value=response)
@@ -656,17 +665,16 @@ async def current_predictions(ctx):
         predictions_string = '\n'.join(current_predictions_list)
 
         if is_home:
-            response = f'Score predictions for *West Ham vs {away_team}*\nin the {competition} ({round})'
+            response = f'Score predictions for *West Ham vs {away_team}*\n' \
+                       f'in the {competition} ({competition_round})'
         else:
-            response = f'Score predictions for *{home_team} vs West Ham*\nin the {competition} ({round})'
+            response = f'Score predictions for *{home_team} vs West Ham*\n' \
+                       f'in the {competition} ({competition_round})'
 
         embed = discord.Embed(title=response, colour=discord.Colour.from_rgb(129, 19, 49))
         embed.add_field(name="Current Predictions", value=predictions_string)
 
-
     await ctx.send(embed=embed)
-
-
 
 
 @bot.command(name='leaderboard', help='Shows top score predictors!')
@@ -701,8 +709,8 @@ async def leaderboard(ctx):
     # To sort out double digit correct predictions
     # maybe add a white space to single digit values to match spacing of double digit values?
 
-# ----------------------------------------------------------------------------------------------------------------------
 
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 # Admin Tools
@@ -711,7 +719,6 @@ async def leaderboard(ctx):
 @commands.has_permissions(administrator=True)
 async def admintest(ctx):
     await ctx.send('You have admin rights')
-
 
 
 # At the moment, this function will clear the User Objects, so all current predictions and any scoreboard rating
@@ -726,13 +733,11 @@ async def clear_users(ctx):
     await ctx.send('Files have been cleared')
 
 
-
 @bot.command(name='force-backup', help='Admin Only - Force a file backup of the users')
 @commands.has_permissions(administrator=True)
 async def force_backup(ctx):
     await save_to_file()
     await ctx.send('Users backed up to file')
-
 
 
 # Writing and reading Users to Github as storage
@@ -807,9 +812,9 @@ async def read_from_file():
     # if fail due to empty file, clear currentUsersClassList to an empty list
     except json.decoder.JSONDecodeError:
         currentUsersClassList.clear()
+
+
 # ----------------------------------------------------------------------------------------------------------------------
-
-
 
 
 # #Api-Football - Leagues by team ID & season
@@ -870,6 +875,8 @@ async def on_error(event, *args, **kwargs):
             f.write(f'Unhandled message: {args[0]}\n')
         else:
             raise
+
+
 # ----------------------------------------------------------------------------------------------------------------------
 
 
