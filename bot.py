@@ -614,6 +614,8 @@ async def current_predictions(ctx):
 
     home_team = nextFixture['teams']['home']['name']
     away_team = nextFixture['teams']['away']['name']
+    competition = nextFixture['league']['name']
+    round = nextFixture['league']['round']
 
     if matchInProgress:
         home_team = currentFixture['teams']['home']['name']
@@ -626,19 +628,44 @@ async def current_predictions(ctx):
         is_home = False
 
     # Combine attributes of each object in UserAndScore class into one string and add to new list
+    # if not current_predictions_list:
+    #     if is_home:
+    #         response = f'No score predictions for **West Ham vs {away_team}**, why not be the first!'
+    #     else:
+    #         response = f'No score predictions for **{home_team} vs West Ham**, why not be the first!'
+    # else:
+    #     if is_home:
+    #         response = f'Here are all the score predictions for **West Ham vs {away_team}**\n\n' \
+    #                    + '\n'.join(current_predictions_list)
+    #     else:
+    #         response = f'Here are all the score predictions for **{home_team} vs West Ham**\n\n' \
+    #                    + '\n'.join(current_predictions_list)
+    # await ctx.send(response)
+
     if not current_predictions_list:
         if is_home:
-            response = f'No score predictions for **West Ham vs {away_team}**, why not be the first!'
+            response = f'No score predictions for *West Ham vs {away_team}*\nin the {competition} ({round}), why not be the first!'
         else:
-            response = f'No score predictions for **{home_team} vs West Ham**, why not be the first!'
+            response = f'No score predictions for *{home_team} vs West Ham*\nin the {competition} ({round}), why not be the first!'
+
+        embed = discord.Embed(title=response, colour=discord.Colour.from_rgb(129, 19, 49))
+        embed.add_field(name="Current Predictions", value=response)
+
     else:
+
+        predictions_string = '\n'.join(current_predictions_list)
+
         if is_home:
-            response = f'Here are all the score predictions for **West Ham vs {away_team}**\n\n' \
-                       + '\n'.join(current_predictions_list)
+            response = f'Score predictions for *West Ham vs {away_team}*\nin the {competition} ({round})'
         else:
-            response = f'Here are all the score predictions for **{home_team} vs West Ham**\n\n' \
-                       + '\n'.join(current_predictions_list)
-    await ctx.send(response)
+            response = f'Score predictions for *{home_team} vs West Ham*\nin the {competition} ({round})'
+
+        embed = discord.Embed(title=response, colour=discord.Colour.from_rgb(129, 19, 49))
+        embed.add_field(name="Current Predictions", value=predictions_string)
+
+
+    await ctx.send(embed=embed)
+
 
 
 
