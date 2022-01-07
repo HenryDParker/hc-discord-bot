@@ -73,7 +73,7 @@ bot_ready = False
 predictions_updated = False
 current_fixture_id = None
 
-# channel_id pulled from admin using !channel then stored in a dict & external json file on Github for any restarts
+# channel_id pulled from admin using {command_prefix}channel then stored in a dict & external json file on Github for any restarts
 
 # Test Server Channel ID
 # channel_id = 917754145367289929
