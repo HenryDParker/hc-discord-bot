@@ -537,6 +537,14 @@ async def score_streak(ctx):
     await ctx.send(response)
 
 
+
+@bot.command(name='force-backup', help='Admin Only - Force a file backup of the users')
+@commands.has_permissions(administrator=True)
+async def force_backup(ctx):
+    await save_to_file()
+    await ctx.send('Users backed up to file')
+
+
 async def save_to_file():
     # create "data" and save all objects in currentUsersClassList in a nested dict
     data = {'Users': []}
