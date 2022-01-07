@@ -2,18 +2,16 @@
 import json
 import os
 import random
-# import discord
-import pickle
 import string
 import re
 import requests
 import time
+import datetime
 
 from github import Github
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
 from datetime import date
-from json import JSONEncoder
 
 # URL to invite bot
 # https://discord.com/api/oauth2/authorize?client_id=917479797242875936&permissions=274878114880&scope=bot
@@ -31,14 +29,22 @@ bot = commands.Bot(command_prefix='!')
 
 # Set up UserAndScore class
 class UserAndScore:
-    def __init__(self, mentionName, username, currentPrediction, numCorrectPredictions):
+    def __init__(self,
+                 mentionName: str,
+                 username: str,
+                 currentPrediction,
+                 numCorrectPredictions: int,
+                 previousPredictionCorrect: bool,
+                 predictionStreak: int,
+                 longestPredictionStreak: int):
         self.mentionName = mentionName
         self.username = username
         self.currentPrediction = currentPrediction
         self.numCorrectPredictions = numCorrectPredictions
-        # self.leaderboardPosition = leaderboardPosition
-        # self.predictionStreak = predictionStreak
-        # self.previousPredictionCorrect = previousPredictionCorrect
+        self.previousPredictionCorrect = previousPredictionCorrect
+        self.predictionStreak = predictionStreak
+        self.longestPredictionStreak = longestPredictionStreak
+
 
 # Global Lists
 currentUsersClassList = []
@@ -46,6 +52,7 @@ currentUsersClassList = []
 # Global Dictionaries
 currentFixture = {}
 nextFixture = {}
+discord_channels = {}
 
 # list of responses to a correct score format
 correct_score_format = [
@@ -58,82 +65,154 @@ correct_score_format = [
 # Global variables
 matchInProgress = False
 bot_ready = False
+predictions_updated = False
 current_fixture_id = None
 
-# channel_id is hard coded in as not sure how to extract channel id without hard coding
-# this will need to be changed for Hammers Chat channel as this is currently Test Server channel id
-channel_id = 917754145367289929
+# channel_id pulled from admin using !channel then stored in a dict & external json file on Github for any restarts
+
+# Test Server Channel ID
+# channel_id = 917754145367289929
+
+# Hammers Chat Channel ID
+# channel_id = 818488786190991360
+
 
 # regex definitions
 scorePattern = re.compile('^[0-9]{1,2}-[0-9]{1,2}$')
 scorePatternHigh = re.compile('^[0-9]{1,5}-[0-9]{1,5}$')
 
-# try:
-#     # with open("file.json", 'r') as f:
-#     #     currentUsersClassList = json.loads(f)
-#     currentUsersClassList = json.loads("file.json")
-# except:
-#     currentUsersClassList = []
+
+@bot.command(name='channel', help='Admin Only - Assign the channel that this bot will operate in')
+@commands.has_permissions(administrator=True)
+async def which_channel(ctx):
+    guild_id = ctx.guild.id
+    channel_id = ctx.channel.id
+    discord_channels[guild_id] = channel_id
+    await write_channel_backup()
+
+
+async def write_channel_backup():
+    # perform local write (NO READ) for testing purposes
+    with open('channel_backup.json', 'w') as outfile:
+        json.dump(discord_channels, outfile, indent=2)
+
+    # convert "data" to a json_string and send this to 'hc-bot-memory' repo on GitHub for backup
+    json_string = json.dumps(discord_channels)
+    github = Github(GITHUBTOKEN)
+    repository = github.get_user().get_repo('hc-bot-memory')
+    filename = 'channel_backup.json'
+    contents = repository.get_contents("")
+    all_files = []
+
+    # check all values in contents
+    while contents:
+        # take first value as file_content
+        file_content = contents.pop(0)
+        # if file_content is a directory (shouldn't ever be)
+        if file_content.type == "dir":
+            contents.extend(repository.get_contents(file_content.path))
+        # else must be a file
+        else:
+            file = file_content
+            # remove extra text to create clean file name for comparison
+            all_files.append(str(file).replace('ContentFile(path="', '').replace('")', ''))
+
+    # check if filename matches in all_files list - if yes then update, if no then create
+    if filename in all_files:
+        contents = repository.get_contents(filename)
+        repository.update_file(filename, "Updated channel_backup file", json_string, contents.sha)
+    else:
+        repository.create_file(filename, "Created channel_backup file", json_string)
+
+
+async def read_channel_backup():
+    try:
+        # download file from Github repo 'hc-bot-memory' and decode to json_string
+        github = Github(GITHUBTOKEN)
+        repository = github.get_user().get_repo('hc-bot-memory')
+        filename = 'channel_backup.json'
+        file = repository.get_contents(filename)
+        json_string = file.decoded_content.decode()
+
+        global discord_channels
+        # convert json_string to "discord_channels"
+        discord_channels = json.loads(json_string)
+
+    # If the read fails in any way, send hardcoded warning message to Test Server and TAG ME
+    except:
+        test_server_id = bot.get_channel(917754145367289929)
+        response = "This bot has failed to read the channel backup from Github <@110010452045467648> "
+        await test_server_id.send(response)
 
 
 # Check fixture info every hour
 @tasks.loop(minutes=30)
 async def check_fixtures():
-    # API call to get team fixtures for current Season
-    url_fixtures = "https://api-football-v1.p.rapidapi.com/v3/fixtures"
+    # Only perform this check after 8am and stop at midnight - can be removed if necessary
+    # This will save API calls as few changes to West Ham fixture will occur between these times
+    timenow = datetime.datetime.now()
+    if timenow.hour >= 9:
+        # find today's date
+        today = date.today()
+        # set the month to an int e.g. 02
+        today_month = int(today.strftime("%m"))
+        # set the year to an int e.g. 2021
+        today_year = int(today.strftime("%Y"))
 
-    # find today's date
-    today = date.today()
-    # set the month to an int e.g. 02
-    today_month = int(today.strftime("%m"))
-    # set the year to an int e.g. 2021
-    today_year = int(today.strftime("%Y"))
+        # if the month is less than 6, set the current_season to the current year, -1 e.g in 02/2022 the season is 2021
+        if today_month < 6:
+            current_season = today_year - 1
+        else:
+            current_season = today_year
 
-    # if the month is less than 6, set the current_season to the current year, -1 e.g in 02/2022 the season is 2021
-    if today_month < 6:
-        current_season = today_year - 1
-    else:
-        current_season = today_year
+        # API call to get team fixtures for current Season
+        url_fixtures = "https://api-football-v1.p.rapidapi.com/v3/fixtures"
 
-    querystring_fixtures = {"season": current_season, "team": "48"}
+        querystring_fixtures = {"season": current_season, "team": "48"}
 
-    headers_fixtures = {
-        'x-rapidapi-host': "api-football-v1.p.rapidapi.com",
-        'x-rapidapi-key': RAPIDAPIKEY
-    }
+        headers_fixtures = {
+            'x-rapidapi-host': "api-football-v1.p.rapidapi.com",
+            'x-rapidapi-key': RAPIDAPIKEY
+        }
 
-    api_response = requests.request("GET", url_fixtures, headers=headers_fixtures, params=querystring_fixtures)
-    data = api_response.text
-    fixtures_dict_json = json.loads(data)
+        api_response = requests.request("GET", url_fixtures, headers=headers_fixtures, params=querystring_fixtures)
+        data = api_response.text
+        fixtures_dict_json = json.loads(data)
 
-    # with open('fixtures_dict_json.json', 'wb') as fixtures_dict_json_file:
-    #     pickle.dump(fixtures_dict_json, fixtures_dict_json_file)
+        with open('fixtures_dict_json.json', 'w') as f:
+            json.dump(fixtures_dict_json, f)
 
-    with open('fixtures_dict_json.json', 'w') as f:
-        json.dump(fixtures_dict_json, f)
+        # # API call to get team info for 2021 Season
+        # url_leagues = "https://api-football-v1.p.rapidapi.com/v3/leagues"
+        #
+        # querystring_leagues = {
+        #     "season": current_season,
+        #     "team": "48"
+        # }
+        #
+        # headers_leagues = {
+        #     'x-rapidapi-host': "api-football-v1.p.rapidapi.com",
+        #     'x-rapidapi-key': RAPIDAPIKEY
+        # }
+        #
+        # api_response = requests.request("GET", url_leagues, headers=headers_leagues, params=querystring_leagues)
+        # data = api_response.text
+        # leagues_dict_json = json.loads(data)
+        #
+        # # with open('leagues_dict_json.json', 'wb') as leagues_dict_json_file:
+        # #     pickle.dump(leagues_dict_json, leagues_dict_json_file)
+        #
+        # with open('leagues_dict_json.json', 'w') as f:
+        #     json.dump(leagues_dict_json, f)
 
-    # # API call to get team info for 2021 Season
-    # url_leagues = "https://api-football-v1.p.rapidapi.com/v3/leagues"
-    #
-    # querystring_leagues = {
-    #     "season": current_season,
-    #     "team": "48"
-    # }
-    #
-    # headers_leagues = {
-    #     'x-rapidapi-host': "api-football-v1.p.rapidapi.com",
-    #     'x-rapidapi-key': RAPIDAPIKEY
-    # }
-    #
-    # api_response = requests.request("GET", url_leagues, headers=headers_leagues, params=querystring_leagues)
-    # data = api_response.text
-    # leagues_dict_json = json.loads(data)
-    #
-    # # with open('leagues_dict_json.json', 'wb') as leagues_dict_json_file:
-    # #     pickle.dump(leagues_dict_json, leagues_dict_json_file)
-    #
-    # with open('leagues_dict_json.json', 'w') as f:
-    #     json.dump(leagues_dict_json, f)
+
+@tasks.loop(minutes=10)
+async def check_save():
+    global predictions_updated
+    if bot_ready:
+        if predictions_updated:
+            await save_to_file()
+            predictions_updated = False
 
 
 # looping every minute for testing purposes
@@ -153,7 +232,6 @@ async def check_next_fixture():
         current_time = int(time.time())
 
         # set shortest_time_diff to arbitrarily high value
-        global shortest_time_diff
         shortest_time_diff = current_time
         global currentFixture
         global current_fixture_id
@@ -238,8 +316,6 @@ async def check_next_fixture():
 @bot.event
 async def give_results():
     if bot_ready:
-        channel = bot.get_channel(channel_id)
-
         with open("fixtures_dict_json.json", "r") as read_file:
             all_fixtures = json.load(read_file)
 
@@ -282,6 +358,13 @@ async def give_results():
                     correct_prediction_list.append(correct_prediction_user_mention)
                     # increment correct predictions tally for "each" when correct
                     each.numCorrectPredictions += 1
+                    # increase prediction streak by 1 and set previousPredictionCorrect to True
+                    each.predictionStreak += 1
+                    each.previousPredictionCorrect = True
+                # else if wrong, set streak to 0 and previousPredictionCorrect to False
+                else:
+                    each.predictionStreak = 0
+                    each.previousPredictionCorrect = False
 
             # Check if list is empty (no correct guesses) and print a response accordingly
             # --- unsure whether this is the correct pythonic way to check empty list
@@ -300,15 +383,16 @@ async def give_results():
             # now clear all user Objects' current predictions in the list
             for each in currentUsersClassList:
                 each.currentPrediction = None
-            await channel.send(response)
+
+            for each in discord_channels:
+                this_channel = bot.get_channel(discord_channels[each])
+                await this_channel.send(response)
             await next_fixture()
 
 
 @bot.event
 async def next_fixture():
-    # Channel ID is static as not sure how to pull Channel ID in code
     if bot_ready:
-        channel = bot.get_channel(channel_id)
         # Grab details for next match
 
         next_home_team = nextFixture['teams']['home']['name']
@@ -323,28 +407,33 @@ async def next_fixture():
             response = f'The next fixture is **West Ham vs {next_away_team}**\nGet your predictions in now using _!p_\n'
         else:
             response = f'The next fixture is **{next_home_team} vs West Ham**\nGet your predictions in now using _!p_\n'
-
-        await channel.send(response)
+        for each in discord_channels:
+            this_channel = bot.get_channel(discord_channels[each])
+            await this_channel.send(response)
 
 
 # When the bot joins a server
 @bot.event
 async def on_ready():
     global bot_ready
+    global currentUsersClassList
     print(f'{bot.user.name} has connected to Discord!')
-    channel = bot.get_channel(channel_id)
     results = f'{bot.user.name} has connected to Discord!'
+    await read_channel_backup()
     bot_ready = True
     try:
         await read_from_file()
     except:
         currentUsersClassList = []
-    await channel.send(results)
+    for each in discord_channels:
+        this_channel = bot.get_channel(discord_channels[each])
+        await this_channel.send(results)
     await next_fixture()
 
 
 @bot.command(name='p', help='Submit (or update) your score prediction! e.g. !p 2-1')
 async def user_prediction(ctx, score):
+    global predictions_updated
     # get current time
     current_time = int(time.time())
     # get next fixtures time
@@ -371,36 +460,35 @@ async def user_prediction(ctx, score):
                         # update that user's current prediction
                         each.currentPrediction = score
 
-
-
                         # write currentPredictionsClassList to a file
                         # with open('currentPredictionsClassList.list', 'wb') as currentPredictionsClassList_file:
                         #     pickle.dump(currentUsersClassList, currentPredictionsClassList_file)
 
-                        await save_to_file()
-
+                        # await save_to_file()
 
                         # if this value is None, then prediction was reset from previous fixture
                         # and no previous prediction for this fixture has occurred
                         # to be used for Score Streak in Future Feature
                         if each.currentPrediction is None:
+                            predictions_updated = True
                             response = random.choice(correct_score_format) + author_mention_name + '!'
                         else:
-                            response = '_Prediction updated_\n' + random.choice(correct_score_format)\
-                                   + author_mention_name + '!'
+                            predictions_updated = True
+                            response = '_Prediction updated_\n' + random.choice(correct_score_format) \
+                                       + author_mention_name + '!'
                         score_added = True
                 if not score_added:
                     # add new user & score to list
                     # new_user is an object of UserAndScore class with name and currentPrediction inside
                     # (more attributes to be added & set to 0/null)
-                    new_user = UserAndScore(author_mention_name, author_text_name, score, 0)
+                    new_user = UserAndScore(author_mention_name, author_text_name, score, 0, False, 0, 0)
                     currentUsersClassList.append(new_user)
+                    predictions_updated = True
 
-                    await save_to_file()
+                    # await save_to_file()
                     # write currentPredictionsClassList to a file
                     # with open('currentPredictionsClassList.list', 'wb') as currentPredictionsClassList_file:
                     #     pickle.dump(currentUsersClassList, currentPredictionsClassList_file)
-
 
                     # with open("file.json", "w") as f:
                     # json.dumps(currentUsersClassList, indent=2)
@@ -415,16 +503,52 @@ async def user_prediction(ctx, score):
     await ctx.send(response)
 
 
+@bot.command(name='correct-scores', help='Check your total number of correct guesses!')
+async def score_streak(ctx):
+    author_mention_name = format(ctx.message.author.mention)
+    response = "It looks like you haven't made any predictions yet!"
+    for each in currentUsersClassList:
+        if each.mentionName == author_mention_name:
+            if each.previousPredictionCorrect:
+                response = f'You have correctly predicted {each.numCorrectPredictions} result(s)' \
+                           f' and your previous guess was correct. Good luck on your prediction streak, ' \
+                           f'it is currently {each.predictionStreak} in a row.'
+            else:
+                response = f'You have correctly predicted {each.numCorrectPredictions} result(s).'
+            break
+    await ctx.send(response)
+
+
+@bot.command(name='score-streak', help='Check your current number of correct guesses in a row!')
+async def score_streak(ctx):
+    author_mention_name = format(ctx.message.author.mention)
+    response = "It looks like you haven't made any predictions yet!"
+    for each in currentUsersClassList:
+        if each.mentionName == author_mention_name:
+            if each.predictionStreak == 0:
+                response = f"Your streak is {each.predictionStreak}. " \
+                           f"It looks like you got the previous result wrong or you didn't make a guess!"
+            elif each.predictionStreak == 1:
+                response = f"Your streak is {each.predictionStreak}. " \
+                           f"Congratulations on the previous correct result, good luck on the next one!"
+            else:
+                response = f'Your current streak is {each.predictionStreak} correct predictions in a row!'
+            break
+    await ctx.send(response)
+
+
 async def save_to_file():
     # create "data" and save all objects in currentUsersClassList in a nested dict
-    data = {}
-    data['Users'] = []
+    data = {'Users': []}
     for each in currentUsersClassList:
         data['Users'].append({
             'mentionName': each.mentionName,
             'username': each.username,
             'currentPrediction': each.currentPrediction,
-            'numCorrectPredictions': each.numCorrectPredictions
+            'numCorrectPredictions': each.numCorrectPredictions,
+            'previousPredictionCorrect': each.previousPredictionCorrect,
+            'predictionStreak': each.predictionStreak,
+            'longestPredictionStreak': each.longestPredictionStreak
         })
 
     # perform local write (NO READ) for testing purposes
@@ -460,7 +584,6 @@ async def save_to_file():
         repository.create_file(filename, "Created predictions file", json_string)
 
 
-
 async def read_from_file():
     try:
         # download file from Github repo 'hc-bot-memory' and decode to json_string
@@ -476,16 +599,22 @@ async def read_from_file():
             new_user = UserAndScore(each['mentionName'],
                                     each['username'],
                                     each['currentPrediction'],
-                                    each['numCorrectPredictions'])
+                                    each['numCorrectPredictions'],
+                                    each['previousPredictionCorrect'],
+                                    each['predictionStreak'],
+                                    each['longestPredictionStreak'])
             currentUsersClassList.append(new_user)
     # if fail due to empty file, clear currentUsersClassList to an empty list
     except json.decoder.JSONDecodeError:
         currentUsersClassList.clear()
 
+
 # At the moment, this function will clear the User Objects, so all current predictions and any scoreboard rating
 
-@bot.command(name='clear-predictions', help='Clear the users and predictions in memory')
-async def clear_predictions(ctx):
+@bot.command(name='clear-users',
+             help='Admin Only - Clear ALL the users, predictions and their history in memory - use with caution')
+@commands.has_permissions(administrator=True)
+async def clear_users(ctx):
     currentUsersClassList.clear()
 
     await ctx.send('Memory has been cleared')
@@ -494,16 +623,19 @@ async def clear_predictions(ctx):
 
     await ctx.send('Files have been cleared')
 
+@bot.command(name='admintest', help='Admin Only - Tells you if you have admin rights')
+@commands.has_permissions(administrator=True)
+async def admintest(ctx):
+    await ctx.send('You have admin rights')
+
 
 @bot.command(name='predictions', help='Show all upcoming or current match predictions!')
 async def current_predictions(ctx):
-
     # Create temporary currentPredictions list from Objects rather than globally
     current_predictions_list = []
     for each in currentUsersClassList:
         score_and_name = each.currentPrediction + ' - ' + each.username
         current_predictions_list.append(score_and_name)
-
 
     home_team = nextFixture['teams']['home']['name']
     away_team = nextFixture['teams']['away']['name']
@@ -536,7 +668,23 @@ async def current_predictions(ctx):
 
 @bot.command(name='leaderboard', help='Shows top score predictors!')
 async def leaderboard(ctx):
-    response = 'A leaderboard is coming soon!'
+    unsorted_leaderboard_dict = {}
+    for each in currentUsersClassList:
+        correct_predictions = each.numCorrectPredictions
+        username = each.username
+        unsorted_leaderboard_dict[username] = correct_predictions
+
+    leaderboard_dict = {}
+    sorted_key = sorted(unsorted_leaderboard_dict, key=unsorted_leaderboard_dict.get, reverse=True)
+    for x in sorted_key:
+        leaderboard_dict[x] = unsorted_leaderboard_dict[x]
+
+    # Format response into a table
+    response = ("\n\n**Top Predictions Leaderboard**" +
+                "\n\n```Correct Scores |  Username"
+                "\n---------------+------------------------"
+                "\n" + "\n".join("\t  {}\t\t|  {}".format(v, k) for k, v in leaderboard_dict.items()) + "```")
+
     await ctx.send(response)
 
 
@@ -601,6 +749,7 @@ async def on_error(event, *args, **kwargs):
 
 check_fixtures.start()
 check_next_fixture.start()
+check_save.start()
 
 bot.run(TOKEN)
 
