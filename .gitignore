@@ -40,3 +40,7 @@ vignettes/*.pdf
 
 # .env files
 .env
+
+# Files backed up on GitHub Memory Repo
+channel_backup.json
+users.json
