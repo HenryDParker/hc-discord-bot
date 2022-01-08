@@ -11,7 +11,7 @@ import time
 from github import Github
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
-from datetime import datetime, timezone, date
+from datetime import datetime, date
 from dateutil import tz
 
 # URL to invite bot
