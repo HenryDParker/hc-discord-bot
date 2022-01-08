@@ -11,7 +11,7 @@ import time
 from github import Github
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
-from datetime import datetime, timezone, date
+from datetime import datetime, date
 from dateutil import tz
 
 # URL to invite bot
@@ -101,8 +101,10 @@ scorePatternHigh = re.compile('^[0-9]{1,5}-[0-9]{1,5}$')
 @commands.has_permissions(administrator=True)
 async def which_channel(ctx):
     guild_id = ctx.guild.id
+    guild_name = ctx.guild.name
     channel_id = ctx.channel.id
     discord_channels[guild_id] = channel_id
+    print(f'A channel has been set on {guild_name} with Guild id: {guild_id}')
     await write_channel_backup()
 
 
@@ -138,6 +140,7 @@ async def write_channel_backup():
         repository.update_file(filename, "Updated channel_backup file", json_string, contents.sha)
     else:
         repository.create_file(filename, "Created channel_backup file", json_string)
+    print(f'Channel backup write complete')
 
 
 async def read_channel_backup():
@@ -152,12 +155,14 @@ async def read_channel_backup():
         global discord_channels
         # convert json_string to "discord_channels"
         discord_channels = json.loads(json_string)
+        print(f'Channel backup read complete')
 
     # If the read fails in any way, send hardcoded warning message to Test Server and TAG ME
     except:
         test_server_id = bot.get_channel(917754145367289929)
         response = "This bot has failed to read the channel backup from Github <@110010452045467648> "
         await test_server_id.send(response)
+        print(f'Channel backup read FAILED')
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -199,8 +204,12 @@ async def check_fixtures():
         data = api_response.text
         fixtures_dict_json = json.loads(data)
 
-        with open('fixtures_dict_json.json', 'w') as f:
-            json.dump(fixtures_dict_json, f)
+        try:
+            with open('fixtures_dict_json.json', 'w') as f:
+                json.dump(fixtures_dict_json, f)
+            print(f'Fixture check complete')
+        except:
+            print(f'Fixture check FAILED')
 
         # # API call to get team info for 2021 Season
         # url_leagues = "https://api-football-v1.p.rapidapi.com/v3/leagues"
@@ -397,6 +406,8 @@ async def reminder():
                 em.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
                 await this_channel.send(embed=em)
 
+            print(f'Fixture 24hr reminder sent')
+
 
 
 
@@ -477,6 +488,7 @@ async def give_results():
             for each in discord_channels:
                 this_channel = bot.get_channel(discord_channels[each])
                 await this_channel.send(response)
+            print(f'Prediction results sent')
             await next_fixture()
 
 
@@ -512,6 +524,7 @@ async def next_fixture():
             em.set_thumbnail(url=west_ham_logo)
             em.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
             await this_channel.send(embed=em)
+        print(f'Next fixture information sent')
 
 
 # When the bot joins a server
@@ -538,6 +551,7 @@ async def on_ready():
 async def set_status():
     await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching,
                                                         name=f"West Ham | {command_prefix}help"))
+    print(f'Bot status set')
 
 # Bot help section
 # ----------------------------------------------------------------------------------------------------------------------
@@ -718,12 +732,14 @@ async def current_predictions(ctx):
     away_team = nextFixture['teams']['away']['name']
     competition = nextFixture['league']['name']
     competition_round = nextFixture['league']['round']
+    competition_icon_url = nextFixture['league']['logo']
 
     if matchInProgress:
         home_team = currentFixture['teams']['home']['name']
         away_team = currentFixture['teams']['away']['name']
         competition = nextFixture['league']['name']
         competition_round = nextFixture['league']['round']
+        competition_icon_url = nextFixture['league']['logo']
 
     # Is the match at Home or Away
     if home_team == 'West Ham':
@@ -755,7 +771,7 @@ async def current_predictions(ctx):
                        f'in the {competition} ({competition_round}), why not be the first!'
 
         embed = discord.Embed(title=response, colour=discord.Colour.from_rgb(129, 19, 49))
-        embed.add_field(name="Current Predictions", value=response)
+        embed.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
 
     else:
 
@@ -770,6 +786,7 @@ async def current_predictions(ctx):
 
         embed = discord.Embed(title=response, colour=discord.Colour.from_rgb(129, 19, 49))
         embed.add_field(name="Current Predictions", value=predictions_string)
+        embed.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
 
     await ctx.send(embed=embed)
 
@@ -816,6 +833,7 @@ async def leaderboard(ctx):
 @commands.has_permissions(administrator=True)
 async def admintest(ctx):
     await ctx.send('You have admin rights')
+    print(f'admintest run in {ctx.guild.name} - {ctx.guild.id}')
 
 
 # At the moment, this function will clear the User Objects, so all current predictions and any scoreboard rating
@@ -829,12 +847,16 @@ async def clear_users(ctx):
     await save_to_file()
     await ctx.send('Files have been cleared')
 
+    print(f'Clear_Users run in {ctx.guild.name} - {ctx.guild.id}')
+
 
 @bot.command(name='force-backup', help='Admin Only - Force a file backup of the users')
 @commands.has_permissions(administrator=True)
 async def force_backup(ctx):
     await save_to_file()
     await ctx.send('Users backed up to file')
+
+    print(f'Force backup run in {ctx.guild.name} - {ctx.guild.id}')
 
 
 # Writing and reading Users to Github as storage
@@ -879,11 +901,17 @@ async def save_to_file():
             all_files.append(str(file).replace('ContentFile(path="', '').replace('")', ''))
 
     # check if filename matches in all_files list - if yes then update, if no then create
-    if filename in all_files:
-        contents = repository.get_contents(filename)
-        repository.update_file(filename, "Updated predictions file", json_string, contents.sha)
-    else:
-        repository.create_file(filename, "Created predictions file", json_string)
+    try:
+        if filename in all_files:
+            contents = repository.get_contents(filename)
+            repository.update_file(filename, "Updated predictions file", json_string, contents.sha)
+        else:
+            repository.create_file(filename, "Created predictions file", json_string)
+        print(f'Users save to file successful')
+    except:
+        print(f'Users save to file FAILED')
+
+
 
 
 async def read_from_file():
@@ -906,9 +934,11 @@ async def read_from_file():
                                     each['predictionStreak'],
                                     each['longestPredictionStreak'])
             currentUsersClassList.append(new_user)
+        print(f'Users save to file successful')
     # if fail due to empty file, clear currentUsersClassList to an empty list
     except json.decoder.JSONDecodeError:
         currentUsersClassList.clear()
+        print(f'Users save to file FAILED - or empty file')
 
 
 # ----------------------------------------------------------------------------------------------------------------------
