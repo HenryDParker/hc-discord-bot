@@ -732,12 +732,14 @@ async def current_predictions(ctx):
     away_team = nextFixture['teams']['away']['name']
     competition = nextFixture['league']['name']
     competition_round = nextFixture['league']['round']
+    competition_icon_url = nextFixture['league']['logo']
 
     if matchInProgress:
         home_team = currentFixture['teams']['home']['name']
         away_team = currentFixture['teams']['away']['name']
         competition = nextFixture['league']['name']
         competition_round = nextFixture['league']['round']
+        competition_icon_url = nextFixture['league']['logo']
 
     # Is the match at Home or Away
     if home_team == 'West Ham':
@@ -769,7 +771,7 @@ async def current_predictions(ctx):
                        f'in the {competition} ({competition_round}), why not be the first!'
 
         embed = discord.Embed(title=response, colour=discord.Colour.from_rgb(129, 19, 49))
-        embed.add_field(name="Current Predictions", value=response)
+        embed.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
 
     else:
 
@@ -784,6 +786,7 @@ async def current_predictions(ctx):
 
         embed = discord.Embed(title=response, colour=discord.Colour.from_rgb(129, 19, 49))
         embed.add_field(name="Current Predictions", value=predictions_string)
+        embed.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
 
     await ctx.send(embed=embed)
 
