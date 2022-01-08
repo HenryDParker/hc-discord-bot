@@ -422,11 +422,11 @@ async def next_fixture():
         if is_home:
             response = f'The next fixture is **West Ham vs {next_away_team}**' \
                        f' in the {competition} ({competition_round})\n' \
-                       f'Get your predictions in now using {command_prefix}p\n'
+                       f'Get your predictions in now using *{command_prefix}p*\n'
         else:
             response = f'The next fixture is **{next_home_team} vs West Ham**' \
                        f' in the {competition} ({competition_round})' \
-                       f'\nGet your predictions in now using {command_prefix}p\n'
+                       f'\nGet your predictions in now using *{command_prefix}p*\n'
 
         for each in discord_channels:
             this_channel = bot.get_channel(discord_channels[each])
@@ -449,8 +449,14 @@ async def on_ready():
     for each in discord_channels:
         this_channel = bot.get_channel(discord_channels[each])
         await this_channel.send(results)
+    await set_status()
     await next_fixture()
 
+
+# Set bot status
+async def set_status():
+    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching,
+                                                        name=f"West Ham | {command_prefix}help"))
 
 # Bot help section
 # ----------------------------------------------------------------------------------------------------------------------
