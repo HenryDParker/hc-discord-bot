@@ -80,7 +80,8 @@ utc_tz = tz.gettz('UTC')
 uk_tz = tz.gettz('Europe/London')
 
 
-# channel_id pulled from admin using {command_prefix}channel then stored in a dict & external json file on Github for any restarts
+# channel_id pulled from admin using {command_prefix}channel
+# then stored in a dict & external json file on Github for any restarts
 
 # Test Server Channel ID
 # channel_id = 917754145367289929
@@ -547,6 +548,7 @@ async def help(ctx):
 
     em.add_field(name="Commands",
                  value=f"**{command_prefix}p** - Add or update your score prediction\n"
+                       f"**{command_prefix}predictions** - Show the predictions for the upcoming fixture\n"
                        f"**{command_prefix}leaderboard** - Show the current leaderboard of predictors\n"
                        f"**{command_prefix}correct-scores** - Your total number of correct scores\n"
                        f"**{command_prefix}score-streak** - Your current number of correct scores in a row\n")
@@ -558,6 +560,12 @@ async def p(ctx):
     em = discord.Embed(title="p", description="Add or update you score prediction for the next match",
                        colour=discord.Colour.from_rgb(129, 19, 49))
     em.add_field(name="*Syntax*", value=f"{command_prefix}p *homescore*-*awayscore*")
+    await ctx.send(embed=em)
+
+@help.command(name="predictions")
+async def predictions(ctx):
+    em = discord.Embed(title="predictions", description="Show all the submitted predictions for the upcoming fixture",
+                       colour=discord.Colour.from_rgb(129, 19, 49))
     await ctx.send(embed=em)
 
 
@@ -701,6 +709,8 @@ async def current_predictions(ctx):
     # Create temporary currentPredictions list from Objects rather than globally
     current_predictions_list = []
     for each in currentUsersClassList:
+        if each.currentPrediction is None:
+            continue
         score_and_name = each.currentPrediction + ' - ' + each.username
         current_predictions_list.append(score_and_name)
 
