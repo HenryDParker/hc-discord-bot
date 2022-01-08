@@ -7,12 +7,12 @@ import re
 import discord
 import requests
 import time
-import datetime
 
 from github import Github
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
-from datetime import date
+from datetime import datetime, timezone, date
+from dateutil import tz
 
 # URL to invite bot
 # https://discord.com/api/oauth2/authorize?client_id=917479797242875936&permissions=274878114880&scope=bot
@@ -72,6 +72,13 @@ matchInProgress = False
 bot_ready = False
 predictions_updated = False
 current_fixture_id = None
+
+west_ham_logo = "https://media.api-sports.io/football/teams/48.png"
+
+# Setting up timezones
+utc_tz = tz.gettz('UTC')
+uk_tz = tz.gettz('Europe/London')
+
 
 # channel_id pulled from admin using {command_prefix}channel then stored in a dict & external json file on Github for any restarts
 
@@ -162,7 +169,7 @@ async def read_channel_backup():
 async def check_fixtures():
     # Only perform this check after 8am and stop at midnight - can be removed if necessary
     # This will save API calls as few changes to West Ham fixture will occur between these times
-    timenow = datetime.datetime.now()
+    timenow = datetime.now()
     if timenow.hour >= 9:
         # find today's date
         today = date.today()
@@ -324,6 +331,73 @@ async def check_next_fixture():
                     matchInProgress = False
                 continue
 
+# 24hrs reminder
+@tasks.loop(minutes=60)
+async def reminder():
+    if bot_ready:
+        timenow_iso_utc = datetime.now(tz=utc_tz).isoformat(timespec='seconds')
+        next_kickoff_iso_utc = nextFixture['fixture']['date']
+
+        timenow_utc = datetime.strptime(timenow_iso_utc, '%Y-%m-%dT%H:%M:%S%z')
+        next_kickoff_utc = datetime.strptime(next_kickoff_iso_utc, '%Y-%m-%dT%H:%M:%S%z')
+
+        # Check difference in times
+        year_diff = next_kickoff_utc.year - timenow_utc.year
+        month_diff = next_kickoff_utc.month - timenow_utc.month
+        day_diff = next_kickoff_utc.day - timenow_utc.day
+
+        hour_diff = next_kickoff_utc.hour - timenow_utc.hour
+        # minute_diff = next_kickoff_utc.minute - timenow_utc.minute
+
+        # datetime is naive, so set timezone
+        next_kickoff_utc = next_kickoff_utc.replace(tzinfo=utc_tz)
+        timenow_utc = timenow_utc.replace(tzinfo=utc_tz)
+
+        next_kickoff_uk = next_kickoff_utc.astimezone(uk_tz)
+
+
+        # Convert back to strings to allow for leading 0s
+        next_kickoff_hour = next_kickoff_uk.strftime("%H")
+        next_kickoff_minute = next_kickoff_uk.strftime("%M")
+
+
+
+        if year_diff == 0 and month_diff == 0 and day_diff == 1 and hour_diff == 0:
+
+            next_home_team = nextFixture['teams']['home']['name']
+            next_away_team = nextFixture['teams']['away']['name']
+            competition = nextFixture['league']['name']
+            competition_round = nextFixture['league']['round']
+            competition_icon_url = nextFixture['league']['logo']
+
+            if next_home_team == 'West Ham':
+                is_home = True
+            else:
+                is_home = False
+
+            if is_home:
+                response = f'**West Ham vs {next_away_team}** starts in less than 24 hours ' \
+                           f'at {next_kickoff_hour}:{next_kickoff_minute} UK Time'
+            else:
+                response = f'**{next_home_team} vs West Ham** starts in less than 24 hours ' \
+                           f'at {next_kickoff_hour}:{next_kickoff_minute} UK Time'
+
+            predictions_prompt = f'Get your predictions in now using *{command_prefix}p*'
+
+            for each in discord_channels:
+                this_channel = bot.get_channel(discord_channels[each])
+                # await this_channel.send(response)
+
+
+                em = discord.Embed(title="**Match Reminder**",
+                                   description=f'{response}\n{predictions_prompt}',
+                                   colour=discord.Colour.from_rgb(129, 19, 49))
+                em.set_thumbnail(url=west_ham_logo)
+                em.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
+                await this_channel.send(embed=em)
+
+
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -413,6 +487,8 @@ async def next_fixture():
         next_away_team = nextFixture['teams']['away']['name']
         competition = nextFixture['league']['name']
         competition_round = nextFixture['league']['round']
+        competition_icon_url = nextFixture['league']['logo']
+
 
         if next_home_team == 'West Ham':
             is_home = True
@@ -420,17 +496,21 @@ async def next_fixture():
             is_home = False
 
         if is_home:
-            response = f'The next fixture is **West Ham vs {next_away_team}**' \
-                       f' in the {competition} ({competition_round})\n' \
-                       f'Get your predictions in now using *{command_prefix}p*\n'
+            response = f'The next fixture is **West Ham vs {next_away_team}**'
         else:
-            response = f'The next fixture is **{next_home_team} vs West Ham**' \
-                       f' in the {competition} ({competition_round})' \
-                       f'\nGet your predictions in now using *{command_prefix}p*\n'
+            response = f'The next fixture is **{next_home_team} vs West Ham**'
+
+        predictions_prompt = f'Get your predictions in now using *{command_prefix}p*'
 
         for each in discord_channels:
             this_channel = bot.get_channel(discord_channels[each])
-            await this_channel.send(response)
+
+            em = discord.Embed(title="**Next Fixture**",
+                               description=f'{response}\n{predictions_prompt}',
+                               colour=discord.Colour.from_rgb(129, 19, 49))
+            em.set_thumbnail(url=west_ham_logo)
+            em.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
+            await this_channel.send(embed=em)
 
 
 # When the bot joins a server
@@ -578,6 +658,7 @@ async def user_prediction(ctx, score):
         else:
             response = "Please structure your prediction correctly e.g. 1-0 "
     # ignore this error - not possible to return a blank response due to use of boolean "score_added"
+    # noinspection PyUnboundLocalVariable
     await ctx.send(response)
 
 
@@ -889,6 +970,7 @@ async def on_error(event, *args, **kwargs):
 check_fixtures.start()
 check_next_fixture.start()
 check_save.start()
+reminder.start()
 
 bot.run(TOKEN)
 
