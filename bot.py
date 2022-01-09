@@ -79,7 +79,6 @@ west_ham_logo = "https://media.api-sports.io/football/teams/48.png"
 utc_tz = tz.gettz('UTC')
 uk_tz = tz.gettz('Europe/London')
 
-
 # channel_id pulled from admin using {command_prefix}channel
 # then stored in a dict & external json file on Github for any restarts
 
@@ -184,7 +183,8 @@ async def check_fixtures():
         # set the year to an int e.g. 2021
         today_year = int(today.strftime("%Y"))
 
-        # if the month is less than 6, set the current_season to the current year, -1 e.g in 02/2022 the season is 2021
+        # if the month is less than 6, set the current_season to the current year, -1
+        # e.g in 03/2022 the season is 2021
         if today_month < 6:
             current_season = today_year - 1
         else:
@@ -207,9 +207,9 @@ async def check_fixtures():
         try:
             with open('fixtures_dict_json.json', 'w') as f:
                 json.dump(fixtures_dict_json, f)
-            print(f'Fixture check complete')
+            print(f'API Fixture check complete')
         except:
-            print(f'Fixture check FAILED')
+            print(f'API Fixture check FAILED')
 
         # # API call to get team info for 2021 Season
         # url_leagues = "https://api-football-v1.p.rapidapi.com/v3/leagues"
@@ -247,15 +247,10 @@ async def check_save():
 # looping every minute for testing purposes
 @tasks.loop(minutes=1)
 async def check_next_fixture():
+    print(f'Check next fixture')
     global matchInProgress
     with open("fixtures_dict_json.json", "r") as read_file:
         all_fixtures = json.load(read_file)
-
-        # Test - pulls first fixture's timestamp
-        # first_fixture = all_fixtures['response'][0]['fixture']['timestamp']
-
-        # creates list with full "response" dictionary from api
-        all_fixtures_list = all_fixtures['response']
 
         # for each item in response dictionary list, find timestamp
         current_time = int(time.time())
@@ -269,13 +264,14 @@ async def check_next_fixture():
             for each in all_fixtures['response']:
                 if each['fixture']['id'] == current_fixture_id:
                     if each['fixture']['status']['short'] == 'FT' \
-                            or each == 'AET' \
-                            or each == 'PEN' \
-                            or each == 'PST' \
-                            or each == 'CANC' \
-                            or each == 'ABD' \
-                            or each == 'AWD' \
-                            or each == 'WO':
+                            or each['fixture']['status']['short'] == 'AET' \
+                            or each['fixture']['status']['short'] == 'PEN' \
+                            or each['fixture']['status']['short'] == 'PST' \
+                            or each['fixture']['status']['short'] == 'CANC' \
+                            or each['fixture']['status']['short'] == 'ABD' \
+                            or each['fixture']['status']['short'] == 'AWD' \
+                            or each['fixture']['status']['short'] == 'WO':
+                        print(f'Current fixture has a Full Time status')
                         await give_results()
                         current_fixture_id = None
                         currentFixture = {}
@@ -316,7 +312,8 @@ async def check_next_fixture():
                 # get fixture id
                 current_fixture_id = (each['fixture']['id'])
                 currentFixture = each
-                break
+                print(f'Match in progress is set to currentFixture')
+                continue
 
             # else check if fixture status is not started
             elif fixture_status == 'NS':
@@ -328,6 +325,7 @@ async def check_next_fixture():
                     shortest_time_diff = time_difference
                     global nextFixture
                     nextFixture = each
+                    print(f'Upcoming fixture set to nextFixture')
 
                 else:
                     # no, continue to next fixture
@@ -339,7 +337,9 @@ async def check_next_fixture():
                 if matchInProgress:
                     await give_results()
                     matchInProgress = False
+                    print(f'Match in progress is TBD, SUSP or INT')
                 continue
+
 
 # 24hrs reminder
 @tasks.loop(minutes=60)
@@ -365,12 +365,9 @@ async def reminder():
 
         next_kickoff_uk = next_kickoff_utc.astimezone(uk_tz)
 
-
         # Convert back to strings to allow for leading 0s
         next_kickoff_hour = next_kickoff_uk.strftime("%H")
         next_kickoff_minute = next_kickoff_uk.strftime("%M")
-
-
 
         if year_diff == 0 and month_diff == 0 and day_diff == 1 and hour_diff == 0:
 
@@ -398,7 +395,6 @@ async def reminder():
                 this_channel = bot.get_channel(discord_channels[each])
                 # await this_channel.send(response)
 
-
                 em = discord.Embed(title="**Match Reminder**",
                                    description=f'{response}\n{predictions_prompt}',
                                    colour=discord.Colour.from_rgb(129, 19, 49))
@@ -407,8 +403,6 @@ async def reminder():
                 await this_channel.send(embed=em)
 
             print(f'Fixture 24hr reminder sent')
-
-
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -449,6 +443,9 @@ async def give_results():
                         # Short fixture result for prediction comparison  (NOT including penalties at the moment)
                         fixture_result_score = f'{str(home_score)}-{str(away_score)}'
 
+            global matchInProgress
+            matchInProgress = False
+
             # Create an initially empty list for the correct predictions
             correct_prediction_list = []
             # For each object in class, check if their currentPrediction matches the fixture score result
@@ -459,8 +456,11 @@ async def give_results():
                     correct_prediction_list.append(correct_prediction_user_mention)
                     # increment correct predictions tally for "each" when correct
                     each.numCorrectPredictions += 1
-                    # increase prediction streak by 1 and set previousPredictionCorrect to True
+                    # increase prediction streak by 1, increase longest streak if new streak is larger
+                    # and set previousPredictionCorrect to True
                     each.predictionStreak += 1
+                    if each.predictionStreak < each.longestPredictionStreak:
+                        each.longestPredictionStreak = each.predictionStreak
                     each.previousPredictionCorrect = True
                 # else if wrong, set streak to 0 and previousPredictionCorrect to False
                 else:
@@ -485,6 +485,9 @@ async def give_results():
             for each in currentUsersClassList:
                 each.currentPrediction = None
 
+            # write class to file
+            await save_to_file()
+
             for each in discord_channels:
                 this_channel = bot.get_channel(discord_channels[each])
                 await this_channel.send(response)
@@ -502,6 +505,16 @@ async def next_fixture():
         competition_round = nextFixture['league']['round']
         competition_icon_url = nextFixture['league']['logo']
 
+        if matchInProgress:
+            current_home_team = currentFixture['teams']['home']['name']
+            current_away_team = currentFixture['teams']['away']['name']
+            current_competition = currentFixture['league']['name']
+            current_competition_round = currentFixture['league']['round']
+            current_competition_icon_url = currentFixture['league']['logo']
+            if current_home_team == 'West Ham':
+                current_is_home = True
+            else:
+                current_is_home = False
 
         if next_home_team == 'West Ham':
             is_home = True
@@ -517,6 +530,17 @@ async def next_fixture():
 
         for each in discord_channels:
             this_channel = bot.get_channel(discord_channels[each])
+            if matchInProgress:
+                if current_is_home:
+                    response = f'**West Ham vs {next_away_team}**'
+                else:
+                    response = f'**{next_home_team} vs West Ham**'
+                em_current = discord.Embed(title="**There is a match in progress!**",
+                                           description=f'{response}',
+                                           colour=discord.Colour.from_rgb(129, 19, 49))
+                em_current.set_footer(text=f'{current_competition} ({current_competition_round})',
+                                      icon_url=current_competition_icon_url)
+                await this_channel.send(embed=em_current)
 
             em = discord.Embed(title="**Next Fixture**",
                                description=f'{response}\n{predictions_prompt}',
@@ -540,6 +564,7 @@ async def on_ready():
         await read_from_file()
     except:
         currentUsersClassList = []
+        print(f'currentUsersClass has been set to empty as file read failed')
     for each in discord_channels:
         this_channel = bot.get_channel(discord_channels[each])
         await this_channel.send(results)
@@ -553,15 +578,15 @@ async def set_status():
                                                         name=f"West Ham | {command_prefix}help"))
     print(f'Bot status set')
 
+
 # Bot help section
 # ----------------------------------------------------------------------------------------------------------------------
 @bot.group(invoke_without_command=True)
 async def help(ctx):
     em = discord.Embed(title="Help", description=f"Use {command_prefix}help *command* for extended information",
                        colour=discord.Colour.from_rgb(129, 19, 49))
-
     em.add_field(name="Commands",
-                 value=f"**{command_prefix}p** - Add or update your score prediction\n"
+                 value=f"**{command_prefix}p** or **{command_prefix}predict** - Add or update your score prediction\n"
                        f"**{command_prefix}predictions** - Show the predictions for the upcoming fixture\n"
                        f"**{command_prefix}leaderboard** - Show the current leaderboard of predictors\n"
                        f"**{command_prefix}correct-scores** - Your total number of correct scores\n"
@@ -575,6 +600,16 @@ async def p(ctx):
                        colour=discord.Colour.from_rgb(129, 19, 49))
     em.add_field(name="*Syntax*", value=f"{command_prefix}p *homescore*-*awayscore*")
     await ctx.send(embed=em)
+
+@help.command(name="predict")
+async def p(ctx):
+    em = discord.Embed(title="predict",
+                       description=f"An alias of {command_prefix}p "
+                                   f"- Add or update you score prediction for the next match",
+                       colour=discord.Colour.from_rgb(129, 19, 49))
+    em.add_field(name="*Syntax*", value=f"{command_prefix}predict *homescore*-*awayscore*")
+    await ctx.send(embed=em)
+
 
 @help.command(name="predictions")
 async def predictions(ctx):
@@ -604,13 +639,13 @@ async def score_streak(ctx):
                        colour=discord.Colour.from_rgb(129, 19, 49))
     await ctx.send(embed=em)
 
-
 # ----------------------------------------------------------------------------------------------------------------------
 
 
 # User commands
 # ----------------------------------------------------------------------------------------------------------------------
-@bot.command(name='p', help=f'Submit (or update) your score prediction! e.g. {command_prefix}p 2-1')
+@bot.command(name='p', help=f'Submit (or update) your score prediction! e.g. {command_prefix}p 2-1',
+             aliases=["predict"])
 async def user_prediction(ctx, score):
     global predictions_updated
     # get current time
@@ -675,17 +710,17 @@ async def user_prediction(ctx, score):
                     # json.dump(currentUsersClassList, f, indent=2)
 
                     response = random.choice(correct_score_format) + author_mention_name + '!'
+                    print(f'A user has made a prediction - {author_text_name} {score}')
             else:
                 response = "Maybe try being a little more realistic!"
         else:
             response = "Please structure your prediction correctly e.g. 1-0 "
-    # ignore this error - not possible to return a blank response due to use of boolean "score_added"
-    # noinspection PyUnboundLocalVariable
+
     await ctx.send(response)
 
 
 @bot.command(name='correct-scores', help='Check your total number of correct guesses!')
-async def score_streak(ctx):
+async def correct_scores(ctx):
     author_mention_name = format(ctx.message.author.mention)
     response = "It looks like you haven't made any predictions yet!"
     for each in currentUsersClassList:
@@ -698,6 +733,7 @@ async def score_streak(ctx):
                 response = f'You have correctly predicted {each.numCorrectPredictions} result(s).'
             break
     await ctx.send(response)
+    print(f'A user requested their correct_scores')
 
 
 @bot.command(name='score-streak', help='Check your current number of correct guesses in a row!')
@@ -716,6 +752,7 @@ async def score_streak(ctx):
                 response = f'Your current streak is {each.predictionStreak} correct predictions in a row!'
             break
     await ctx.send(response)
+    print(f'A user requested their score_streak')
 
 
 @bot.command(name='predictions', help='Show all upcoming or current match predictions!')
@@ -737,9 +774,9 @@ async def current_predictions(ctx):
     if matchInProgress:
         home_team = currentFixture['teams']['home']['name']
         away_team = currentFixture['teams']['away']['name']
-        competition = nextFixture['league']['name']
-        competition_round = nextFixture['league']['round']
-        competition_icon_url = nextFixture['league']['logo']
+        competition = currentFixture['league']['name']
+        competition_round = currentFixture['league']['round']
+        competition_icon_url = currentFixture['league']['logo']
 
     # Is the match at Home or Away
     if home_team == 'West Ham':
@@ -789,6 +826,7 @@ async def current_predictions(ctx):
         embed.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
 
     await ctx.send(embed=embed)
+    print(f'A user requested upcoming match predictions')
 
 
 @bot.command(name='leaderboard', help='Shows top score predictors!')
@@ -804,21 +842,17 @@ async def leaderboard(ctx):
     for x in sorted_key:
         leaderboard_dict[x] = unsorted_leaderboard_dict[x]
 
-    # Option 1 - Format response into a table using monospaced code block only
-    # response = ("\n\n**Top Predictions Leaderboard**" +
-    #            "\n\n```Correct Scores |  Username"
-    #            "\n---------------+------------------------"
-    #            "\n" + "\n".join("\t  {}\t\t|  {}".format(v, k) for k, v in leaderboard_dict.items()) + "```")
+    leaderboard_dict = {k:v for k, v in leaderboard_dict.items() if v != 0}
 
-    # await ctx.send(response)
 
-    # Option 2 - Format response into a table using Embed & monospaced code block
+    # Format response into a table using Embed & monospaced code block
     leaderboard_string = ("```" + "\n".join("  {}  |  {}".format(v, k) for k, v in leaderboard_dict.items()) + "```")
 
     embed = discord.Embed(title="Top Predictors Leaderboard", colour=discord.Colour.from_rgb(129, 19, 49))
     embed.add_field(name="Correct Predictions", value=leaderboard_string)
 
     await ctx.send(embed=embed)
+    print(f'A user requested the predictions leaderboard')
 
     # To sort out double digit correct predictions
     # maybe add a white space to single digit values to match spacing of double digit values?
@@ -910,8 +944,6 @@ async def save_to_file():
         print(f'Users save to file successful')
     except:
         print(f'Users save to file FAILED')
-
-
 
 
 async def read_from_file():
