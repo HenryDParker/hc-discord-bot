@@ -185,7 +185,8 @@ async def check_fixtures():
             # set the year to an int e.g. 2021
             today_year = int(today.strftime("%Y"))
 
-            # if the month is less than 6, set the current_season to the current year, -1 e.g in 02/2022 the season is 2021
+            # if the month is less than 6, set the current_season to the current year, -1
+            # e.g in 03/2022 the season is 2021
             if today_month < 6:
                 current_season = today_year - 1
             else:
@@ -554,6 +555,7 @@ async def set_status():
                                                         name=f"West Ham | {command_prefix}help"))
     print(f'Bot status set')
 
+
 # Bot help section
 # ----------------------------------------------------------------------------------------------------------------------
 @bot.group(invoke_without_command=True)
@@ -738,9 +740,9 @@ async def current_predictions(ctx):
     if matchInProgress:
         home_team = currentFixture['teams']['home']['name']
         away_team = currentFixture['teams']['away']['name']
-        competition = nextFixture['league']['name']
-        competition_round = nextFixture['league']['round']
-        competition_icon_url = nextFixture['league']['logo']
+        competition = currentFixture['league']['name']
+        competition_round = currentFixture['league']['round']
+        competition_icon_url = currentFixture['league']['logo']
 
     # Is the match at Home or Away
     if home_team == 'West Ham':
