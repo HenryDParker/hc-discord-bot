@@ -79,7 +79,6 @@ west_ham_logo = "https://media.api-sports.io/football/teams/48.png"
 utc_tz = tz.gettz('UTC')
 uk_tz = tz.gettz('Europe/London')
 
-
 # channel_id pulled from admin using {command_prefix}channel
 # then stored in a dict & external json file on Github for any restarts
 
@@ -173,7 +172,7 @@ async def read_channel_backup():
 # Check fixture info every hour
 @tasks.loop(minutes=30)
 async def check_fixtures():
-    if bot_ready:
+    #if bot_ready:
         # Only perform this check after 8am and stop at midnight - can be removed if necessary
         # This will save API calls as few changes to West Ham fixture will occur between these times
         timenow = datetime.now()
@@ -343,6 +342,7 @@ async def check_next_fixture():
                     matchInProgress = False
                 continue
 
+
 # 24hrs reminder
 @tasks.loop(minutes=60)
 async def reminder():
@@ -367,12 +367,9 @@ async def reminder():
 
         next_kickoff_uk = next_kickoff_utc.astimezone(uk_tz)
 
-
         # Convert back to strings to allow for leading 0s
         next_kickoff_hour = next_kickoff_uk.strftime("%H")
         next_kickoff_minute = next_kickoff_uk.strftime("%M")
-
-
 
         if year_diff == 0 and month_diff == 0 and day_diff == 1 and hour_diff == 0:
 
@@ -400,7 +397,6 @@ async def reminder():
                 this_channel = bot.get_channel(discord_channels[each])
                 # await this_channel.send(response)
 
-
                 em = discord.Embed(title="**Match Reminder**",
                                    description=f'{response}\n{predictions_prompt}',
                                    colour=discord.Colour.from_rgb(129, 19, 49))
@@ -409,8 +405,6 @@ async def reminder():
                 await this_channel.send(embed=em)
 
             print(f'Fixture 24hr reminder sent')
-
-
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -451,6 +445,9 @@ async def give_results():
                         # Short fixture result for prediction comparison  (NOT including penalties at the moment)
                         fixture_result_score = f'{str(home_score)}-{str(away_score)}'
 
+                global matchInProgress
+                matchInProgress = False
+
             # Create an initially empty list for the correct predictions
             correct_prediction_list = []
             # For each object in class, check if their currentPrediction matches the fixture score result
@@ -487,6 +484,9 @@ async def give_results():
             for each in currentUsersClassList:
                 each.currentPrediction = None
 
+            # write class to file
+            await save_to_file()
+
             for each in discord_channels:
                 this_channel = bot.get_channel(discord_channels[each])
                 await this_channel.send(response)
@@ -504,6 +504,16 @@ async def next_fixture():
         competition_round = nextFixture['league']['round']
         competition_icon_url = nextFixture['league']['logo']
 
+        if matchInProgress:
+            current_home_team = currentFixture['teams']['home']['name']
+            current_away_team = currentFixture['teams']['away']['name']
+            current_competition = currentFixture['league']['name']
+            current_competition_round = currentFixture['league']['round']
+            current_competition_icon_url = currentFixture['league']['logo']
+            if current_home_team == 'West Ham':
+                current_is_home = True
+            else:
+                current_is_home = False
 
         if next_home_team == 'West Ham':
             is_home = True
@@ -519,6 +529,17 @@ async def next_fixture():
 
         for each in discord_channels:
             this_channel = bot.get_channel(discord_channels[each])
+            if matchInProgress:
+                if current_is_home:
+                    response = f'**West Ham vs {next_away_team}**'
+                else:
+                    response = f'**{next_home_team} vs West Ham**'
+                em_current = discord.Embed(title="**There is a match in progress!**",
+                                           description=f'{response}',
+                                           colour=discord.Colour.from_rgb(129, 19, 49))
+                em_current.set_footer(text=f'{current_competition} ({current_competition_round})',
+                                      icon_url=current_competition_icon_url)
+                await this_channel.send(embed=em_current)
 
             em = discord.Embed(title="**Next Fixture**",
                                description=f'{response}\n{predictions_prompt}',
@@ -578,6 +599,7 @@ async def p(ctx):
                        colour=discord.Colour.from_rgb(129, 19, 49))
     em.add_field(name="*Syntax*", value=f"{command_prefix}p *homescore*-*awayscore*")
     await ctx.send(embed=em)
+
 
 @help.command(name="predictions")
 async def predictions(ctx):
@@ -682,8 +704,7 @@ async def user_prediction(ctx, score):
                 response = "Maybe try being a little more realistic!"
         else:
             response = "Please structure your prediction correctly e.g. 1-0 "
-    # ignore this error - not possible to return a blank response due to use of boolean "score_added"
-    # noinspection PyUnboundLocalVariable
+
     await ctx.send(response)
 
 
@@ -913,8 +934,6 @@ async def save_to_file():
         print(f'Users save to file successful')
     except:
         print(f'Users save to file FAILED')
-
-
 
 
 async def read_from_file():
