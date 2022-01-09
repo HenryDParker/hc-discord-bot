@@ -589,7 +589,7 @@ async def help(ctx):
                        colour=discord.Colour.from_rgb(129, 19, 49))
 
     em.add_field(name="Commands",
-                 value=f"**{command_prefix}p** - Add or update your score prediction\n"
+                 value=f"**{command_prefix}p** or **{command_prefix}predict** - Add or update your score prediction\n"
                        f"**{command_prefix}predictions** - Show the predictions for the upcoming fixture\n"
                        f"**{command_prefix}leaderboard** - Show the current leaderboard of predictors\n"
                        f"**{command_prefix}correct-scores** - Your total number of correct scores\n"
@@ -602,6 +602,15 @@ async def p(ctx):
     em = discord.Embed(title="p", description="Add or update you score prediction for the next match",
                        colour=discord.Colour.from_rgb(129, 19, 49))
     em.add_field(name="*Syntax*", value=f"{command_prefix}p *homescore*-*awayscore*")
+    await ctx.send(embed=em)
+
+@help.command(name="predict")
+async def p(ctx):
+    em = discord.Embed(title="predict",
+                       description=f"An alias of {command_prefix}p "
+                                   f"- Add or update you score prediction for the next match",
+                       colour=discord.Colour.from_rgb(129, 19, 49))
+    em.add_field(name="*Syntax*", value=f"{command_prefix}predict *homescore*-*awayscore*")
     await ctx.send(embed=em)
 
 
