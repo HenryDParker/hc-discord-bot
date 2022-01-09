@@ -639,7 +639,8 @@ async def score_streak(ctx):
 
 # User commands
 # ----------------------------------------------------------------------------------------------------------------------
-@bot.command(name='p', help=f'Submit (or update) your score prediction! e.g. {command_prefix}p 2-1')
+@bot.command(name='p', help=f'Submit (or update) your score prediction! e.g. {command_prefix}p 2-1',
+             aliases=["predict"])
 async def user_prediction(ctx, score):
     global predictions_updated
     # get current time
