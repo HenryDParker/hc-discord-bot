@@ -270,13 +270,14 @@ async def check_next_fixture():
             for each in all_fixtures['response']:
                 if each['fixture']['id'] == current_fixture_id:
                     if each['fixture']['status']['short'] == 'FT' \
-                            or each == 'AET' \
-                            or each == 'PEN' \
-                            or each == 'PST' \
-                            or each == 'CANC' \
-                            or each == 'ABD' \
-                            or each == 'AWD' \
-                            or each == 'WO':
+                            or each['fixture']['status']['short'] == 'AET' \
+                            or each['fixture']['status']['short'] == 'PEN' \
+                            or each['fixture']['status']['short'] == 'PST' \
+                            or each['fixture']['status']['short'] == 'CANC' \
+                            or each['fixture']['status']['short'] == 'ABD' \
+                            or each['fixture']['status']['short'] == 'AWD' \
+                            or each['fixture']['status']['short'] == 'WO':
+
                         await give_results()
                         current_fixture_id = None
                         currentFixture = {}
@@ -317,7 +318,7 @@ async def check_next_fixture():
                 # get fixture id
                 current_fixture_id = (each['fixture']['id'])
                 currentFixture = each
-                break
+                continue
 
             # else check if fixture status is not started
             elif fixture_status == 'NS':
@@ -445,8 +446,8 @@ async def give_results():
                         # Short fixture result for prediction comparison  (NOT including penalties at the moment)
                         fixture_result_score = f'{str(home_score)}-{str(away_score)}'
 
-                global matchInProgress
-                matchInProgress = False
+            global matchInProgress
+            matchInProgress = False
 
             # Create an initially empty list for the correct predictions
             correct_prediction_list = []
@@ -458,8 +459,11 @@ async def give_results():
                     correct_prediction_list.append(correct_prediction_user_mention)
                     # increment correct predictions tally for "each" when correct
                     each.numCorrectPredictions += 1
-                    # increase prediction streak by 1 and set previousPredictionCorrect to True
+                    # increase prediction streak by 1, increase longest streak if new streak is larger
+                    # and set previousPredictionCorrect to True
                     each.predictionStreak += 1
+                    if each.predictionStreak < each.longestPredictionStreak:
+                        each.longestPredictionStreak = each.predictionStreak
                     each.previousPredictionCorrect = True
                 # else if wrong, set streak to 0 and previousPredictionCorrect to False
                 else:
@@ -709,7 +713,7 @@ async def user_prediction(ctx, score):
 
 
 @bot.command(name='correct-scores', help='Check your total number of correct guesses!')
-async def score_streak(ctx):
+async def correct_scores(ctx):
     author_mention_name = format(ctx.message.author.mention)
     response = "It looks like you haven't made any predictions yet!"
     for each in currentUsersClassList:
