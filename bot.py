@@ -172,68 +172,67 @@ async def read_channel_backup():
 # Check fixture info every hour
 @tasks.loop(minutes=30)
 async def check_fixtures():
-    #if bot_ready:
-        # Only perform this check after 8am and stop at midnight - can be removed if necessary
-        # This will save API calls as few changes to West Ham fixture will occur between these times
-        timenow = datetime.now()
-        if timenow.hour >= 9:
-            # find today's date
-            today = date.today()
-            # set the month to an int e.g. 02
-            today_month = int(today.strftime("%m"))
-            # set the year to an int e.g. 2021
-            today_year = int(today.strftime("%Y"))
+    # Only perform this check after 8am and stop at midnight - can be removed if necessary
+    # This will save API calls as few changes to West Ham fixture will occur between these times
+    timenow = datetime.now()
+    if timenow.hour >= 9:
+        # find today's date
+        today = date.today()
+        # set the month to an int e.g. 02
+        today_month = int(today.strftime("%m"))
+        # set the year to an int e.g. 2021
+        today_year = int(today.strftime("%Y"))
 
-            # if the month is less than 6, set the current_season to the current year, -1
-            # e.g in 03/2022 the season is 2021
-            if today_month < 6:
-                current_season = today_year - 1
-            else:
-                current_season = today_year
+        # if the month is less than 6, set the current_season to the current year, -1
+        # e.g in 03/2022 the season is 2021
+        if today_month < 6:
+            current_season = today_year - 1
+        else:
+            current_season = today_year
 
-            # API call to get team fixtures for current Season
-            url_fixtures = "https://api-football-v1.p.rapidapi.com/v3/fixtures"
+        # API call to get team fixtures for current Season
+        url_fixtures = "https://api-football-v1.p.rapidapi.com/v3/fixtures"
 
-            querystring_fixtures = {"season": current_season, "team": "48"}
+        querystring_fixtures = {"season": current_season, "team": "48"}
 
-            headers_fixtures = {
-                'x-rapidapi-host': "api-football-v1.p.rapidapi.com",
-                'x-rapidapi-key': RAPIDAPIKEY
-            }
+        headers_fixtures = {
+            'x-rapidapi-host': "api-football-v1.p.rapidapi.com",
+            'x-rapidapi-key': RAPIDAPIKEY
+        }
 
-            api_response = requests.request("GET", url_fixtures, headers=headers_fixtures, params=querystring_fixtures)
-            data = api_response.text
-            fixtures_dict_json = json.loads(data)
+        api_response = requests.request("GET", url_fixtures, headers=headers_fixtures, params=querystring_fixtures)
+        data = api_response.text
+        fixtures_dict_json = json.loads(data)
 
-            try:
-                with open('fixtures_dict_json.json', 'w') as f:
-                    json.dump(fixtures_dict_json, f)
-                print(f'Fixture check complete')
-            except:
-                print(f'Fixture check FAILED')
+        try:
+            with open('fixtures_dict_json.json', 'w') as f:
+                json.dump(fixtures_dict_json, f)
+            print(f'API Fixture check complete')
+        except:
+            print(f'API Fixture check FAILED')
 
-            # # API call to get team info for 2021 Season
-            # url_leagues = "https://api-football-v1.p.rapidapi.com/v3/leagues"
-            #
-            # querystring_leagues = {
-            #     "season": current_season,
-            #     "team": "48"
-            # }
-            #
-            # headers_leagues = {
-            #     'x-rapidapi-host': "api-football-v1.p.rapidapi.com",
-            #     'x-rapidapi-key': RAPIDAPIKEY
-            # }
-            #
-            # api_response = requests.request("GET", url_leagues, headers=headers_leagues, params=querystring_leagues)
-            # data = api_response.text
-            # leagues_dict_json = json.loads(data)
-            #
-            # # with open('leagues_dict_json.json', 'wb') as leagues_dict_json_file:
-            # #     pickle.dump(leagues_dict_json, leagues_dict_json_file)
-            #
-            # with open('leagues_dict_json.json', 'w') as f:
-            #     json.dump(leagues_dict_json, f)
+        # # API call to get team info for 2021 Season
+        # url_leagues = "https://api-football-v1.p.rapidapi.com/v3/leagues"
+        #
+        # querystring_leagues = {
+        #     "season": current_season,
+        #     "team": "48"
+        # }
+        #
+        # headers_leagues = {
+        #     'x-rapidapi-host': "api-football-v1.p.rapidapi.com",
+        #     'x-rapidapi-key': RAPIDAPIKEY
+        # }
+        #
+        # api_response = requests.request("GET", url_leagues, headers=headers_leagues, params=querystring_leagues)
+        # data = api_response.text
+        # leagues_dict_json = json.loads(data)
+        #
+        # # with open('leagues_dict_json.json', 'wb') as leagues_dict_json_file:
+        # #     pickle.dump(leagues_dict_json, leagues_dict_json_file)
+        #
+        # with open('leagues_dict_json.json', 'w') as f:
+        #     json.dump(leagues_dict_json, f)
 
 
 @tasks.loop(minutes=10)
@@ -248,15 +247,10 @@ async def check_save():
 # looping every minute for testing purposes
 @tasks.loop(minutes=1)
 async def check_next_fixture():
+    print(f'Check next fixture')
     global matchInProgress
     with open("fixtures_dict_json.json", "r") as read_file:
         all_fixtures = json.load(read_file)
-
-        # Test - pulls first fixture's timestamp
-        # first_fixture = all_fixtures['response'][0]['fixture']['timestamp']
-
-        # creates list with full "response" dictionary from api
-        all_fixtures_list = all_fixtures['response']
 
         # for each item in response dictionary list, find timestamp
         current_time = int(time.time())
@@ -277,7 +271,7 @@ async def check_next_fixture():
                             or each['fixture']['status']['short'] == 'ABD' \
                             or each['fixture']['status']['short'] == 'AWD' \
                             or each['fixture']['status']['short'] == 'WO':
-
+                        print(f'Current fixture has a Full Time status')
                         await give_results()
                         current_fixture_id = None
                         currentFixture = {}
@@ -318,6 +312,7 @@ async def check_next_fixture():
                 # get fixture id
                 current_fixture_id = (each['fixture']['id'])
                 currentFixture = each
+                print(f'Match in progress is set to currentFixture')
                 continue
 
             # else check if fixture status is not started
@@ -330,6 +325,7 @@ async def check_next_fixture():
                     shortest_time_diff = time_difference
                     global nextFixture
                     nextFixture = each
+                    print(f'Upcoming fixture set to nextFixture')
 
                 else:
                     # no, continue to next fixture
@@ -341,6 +337,7 @@ async def check_next_fixture():
                 if matchInProgress:
                     await give_results()
                     matchInProgress = False
+                    print(f'Match in progress is TBD, SUSP or INT')
                 continue
 
 
@@ -567,6 +564,7 @@ async def on_ready():
         await read_from_file()
     except:
         currentUsersClassList = []
+        print(f'currentUsersClass has been set to empty as file read failed')
     for each in discord_channels:
         this_channel = bot.get_channel(discord_channels[each])
         await this_channel.send(results)
@@ -587,7 +585,6 @@ async def set_status():
 async def help(ctx):
     em = discord.Embed(title="Help", description=f"Use {command_prefix}help *command* for extended information",
                        colour=discord.Colour.from_rgb(129, 19, 49))
-
     em.add_field(name="Commands",
                  value=f"**{command_prefix}p** or **{command_prefix}predict** - Add or update your score prediction\n"
                        f"**{command_prefix}predictions** - Show the predictions for the upcoming fixture\n"
@@ -641,7 +638,6 @@ async def score_streak(ctx):
                                                          " in a row",
                        colour=discord.Colour.from_rgb(129, 19, 49))
     await ctx.send(embed=em)
-
 
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -714,6 +710,7 @@ async def user_prediction(ctx, score):
                     # json.dump(currentUsersClassList, f, indent=2)
 
                     response = random.choice(correct_score_format) + author_mention_name + '!'
+                    print(f'A user has made a prediction - {author_text_name} {score}')
             else:
                 response = "Maybe try being a little more realistic!"
         else:
@@ -736,6 +733,7 @@ async def correct_scores(ctx):
                 response = f'You have correctly predicted {each.numCorrectPredictions} result(s).'
             break
     await ctx.send(response)
+    print(f'A user requested their correct_scores')
 
 
 @bot.command(name='score-streak', help='Check your current number of correct guesses in a row!')
@@ -754,6 +752,7 @@ async def score_streak(ctx):
                 response = f'Your current streak is {each.predictionStreak} correct predictions in a row!'
             break
     await ctx.send(response)
+    print(f'A user requested their score_streak')
 
 
 @bot.command(name='predictions', help='Show all upcoming or current match predictions!')
@@ -827,6 +826,7 @@ async def current_predictions(ctx):
         embed.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
 
     await ctx.send(embed=embed)
+    print(f'A user requested upcoming match predictions')
 
 
 @bot.command(name='leaderboard', help='Shows top score predictors!')
@@ -842,21 +842,14 @@ async def leaderboard(ctx):
     for x in sorted_key:
         leaderboard_dict[x] = unsorted_leaderboard_dict[x]
 
-    # Option 1 - Format response into a table using monospaced code block only
-    # response = ("\n\n**Top Predictions Leaderboard**" +
-    #            "\n\n```Correct Scores |  Username"
-    #            "\n---------------+------------------------"
-    #            "\n" + "\n".join("\t  {}\t\t|  {}".format(v, k) for k, v in leaderboard_dict.items()) + "```")
-
-    # await ctx.send(response)
-
-    # Option 2 - Format response into a table using Embed & monospaced code block
+    # Format response into a table using Embed & monospaced code block
     leaderboard_string = ("```" + "\n".join("  {}  |  {}".format(v, k) for k, v in leaderboard_dict.items()) + "```")
 
     embed = discord.Embed(title="Top Predictors Leaderboard", colour=discord.Colour.from_rgb(129, 19, 49))
     embed.add_field(name="Correct Predictions", value=leaderboard_string)
 
     await ctx.send(embed=embed)
+    print(f'A user requested the predictions leaderboard')
 
     # To sort out double digit correct predictions
     # maybe add a white space to single digit values to match spacing of double digit values?
