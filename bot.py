@@ -842,6 +842,9 @@ async def leaderboard(ctx):
     for x in sorted_key:
         leaderboard_dict[x] = unsorted_leaderboard_dict[x]
 
+    leaderboard_dict = {k:v for k, v in leaderboard_dict.items() if v != 0}
+
+
     # Format response into a table using Embed & monospaced code block
     leaderboard_string = ("```" + "\n".join("  {}  |  {}".format(v, k) for k, v in leaderboard_dict.items()) + "```")
 
