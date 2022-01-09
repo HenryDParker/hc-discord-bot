@@ -57,7 +57,7 @@ currentUsersClassList = []
 # Global Dictionaries
 currentFixture = {}
 nextFixture = {}
-discord_channels = {}
+#discord_channels = {}
 
 # list of responses to a correct score format
 correct_score_format = [
@@ -82,8 +82,9 @@ uk_tz = tz.gettz('Europe/London')
 # channel_id pulled from admin using {command_prefix}channel
 # then stored in a dict & external json file on Github for any restarts
 
+# Static Channel ID so
 # Test Server Channel ID
-# channel_id = 917754145367289929
+channel_id = 917754145367289929
 
 # Hammers Chat Channel ID
 # channel_id = 818488786190991360
@@ -96,72 +97,72 @@ scorePatternHigh = re.compile('^[0-9]{1,5}-[0-9]{1,5}$')
 
 # Channel assignment, storage and backup
 # ----------------------------------------------------------------------------------------------------------------------
-@bot.command(name='channel', help='Admin Only - Assign the channel that this bot will operate in')
-@commands.has_permissions(administrator=True)
-async def which_channel(ctx):
-    guild_id = ctx.guild.id
-    guild_name = ctx.guild.name
-    channel_id = ctx.channel.id
-    discord_channels[guild_id] = channel_id
-    print(f'A channel has been set on {guild_name} with Guild id: {guild_id}')
-    await write_channel_backup()
+# @bot.command(name='channel', help='Admin Only - Assign the channel that this bot will operate in')
+# @commands.has_permissions(administrator=True)
+# async def which_channel(ctx):
+#     guild_id = ctx.guild.id
+#     guild_name = ctx.guild.name
+#     channel_id = ctx.channel.id
+#     discord_channels[guild_id] = channel_id
+#     print(f'A channel has been set on {guild_name} with Guild id: {guild_id}')
+#     await write_channel_backup()
 
 
-async def write_channel_backup():
-    # perform local write (NO READ) for testing purposes
-    with open('channel_backup.json', 'w') as outfile:
-        json.dump(discord_channels, outfile, indent=2)
-
-    # convert "data" to a json_string and send this to 'hc-bot-memory' repo on GitHub for backup
-    json_string = json.dumps(discord_channels)
-    github = Github(GITHUBTOKEN)
-    repository = github.get_user().get_repo('hc-bot-memory')
-    filename = 'channel_backup.json'
-    contents = repository.get_contents("")
-    all_files = []
-
-    # check all values in contents
-    while contents:
-        # take first value as file_content
-        file_content = contents.pop(0)
-        # if file_content is a directory (shouldn't ever be)
-        if file_content.type == "dir":
-            contents.extend(repository.get_contents(file_content.path))
-        # else must be a file
-        else:
-            file = file_content
-            # remove extra text to create clean file name for comparison
-            all_files.append(str(file).replace('ContentFile(path="', '').replace('")', ''))
-
-    # check if filename matches in all_files list - if yes then update, if no then create
-    if filename in all_files:
-        contents = repository.get_contents(filename)
-        repository.update_file(filename, "Updated channel_backup file", json_string, contents.sha)
-    else:
-        repository.create_file(filename, "Created channel_backup file", json_string)
-    print(f'Channel backup write complete')
-
-
-async def read_channel_backup():
-    try:
-        # download file from Github repo 'hc-bot-memory' and decode to json_string
-        github = Github(GITHUBTOKEN)
-        repository = github.get_user().get_repo('hc-bot-memory')
-        filename = 'channel_backup.json'
-        file = repository.get_contents(filename)
-        json_string = file.decoded_content.decode()
-
-        global discord_channels
-        # convert json_string to "discord_channels"
-        discord_channels = json.loads(json_string)
-        print(f'Channel backup read complete')
-
-    # If the read fails in any way, send hardcoded warning message to Test Server and TAG ME
-    except:
-        test_server_id = bot.get_channel(917754145367289929)
-        response = "This bot has failed to read the channel backup from Github <@110010452045467648> "
-        await test_server_id.send(response)
-        print(f'Channel backup read FAILED')
+# async def write_channel_backup():
+#     # perform local write (NO READ) for testing purposes
+#     with open('channel_backup.json', 'w') as outfile:
+#         json.dump(discord_channels, outfile, indent=2)
+#
+#     # convert "data" to a json_string and send this to 'hc-bot-memory' repo on GitHub for backup
+#     json_string = json.dumps(discord_channels)
+#     github = Github(GITHUBTOKEN)
+#     repository = github.get_user().get_repo('hc-bot-memory')
+#     filename = 'channel_backup.json'
+#     contents = repository.get_contents("")
+#     all_files = []
+#
+#     # check all values in contents
+#     while contents:
+#         # take first value as file_content
+#         file_content = contents.pop(0)
+#         # if file_content is a directory (shouldn't ever be)
+#         if file_content.type == "dir":
+#             contents.extend(repository.get_contents(file_content.path))
+#         # else must be a file
+#         else:
+#             file = file_content
+#             # remove extra text to create clean file name for comparison
+#             all_files.append(str(file).replace('ContentFile(path="', '').replace('")', ''))
+#
+#     # check if filename matches in all_files list - if yes then update, if no then create
+#     if filename in all_files:
+#         contents = repository.get_contents(filename)
+#         repository.update_file(filename, "Updated channel_backup file", json_string, contents.sha)
+#     else:
+#         repository.create_file(filename, "Created channel_backup file", json_string)
+#     print(f'Channel backup write complete')
+#
+#
+# async def read_channel_backup():
+#     try:
+#         # download file from Github repo 'hc-bot-memory' and decode to json_string
+#         github = Github(GITHUBTOKEN)
+#         repository = github.get_user().get_repo('hc-bot-memory')
+#         filename = 'channel_backup.json'
+#         file = repository.get_contents(filename)
+#         json_string = file.decoded_content.decode()
+#
+#         global discord_channels
+#         # convert json_string to "discord_channels"
+#         discord_channels = json.loads(json_string)
+#         print(f'Channel backup read complete')
+#
+#     # If the read fails in any way, send hardcoded warning message to Test Server and TAG ME
+#     except:
+#         test_server_id = bot.get_channel(917754145367289929)
+#         response = "This bot has failed to read the channel backup from Github <@110010452045467648> "
+#         await test_server_id.send(response)
+#         print(f'Channel backup read FAILED')
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -391,16 +392,16 @@ async def reminder():
 
             predictions_prompt = f'Get your predictions in now using *{command_prefix}p*'
 
-            for each in discord_channels:
-                this_channel = bot.get_channel(discord_channels[each])
-                # await this_channel.send(response)
+            #for each in discord_channels:
+            this_channel = bot.get_channel(channel_id)
+            # await this_channel.send(response)
 
-                em = discord.Embed(title="**Match Reminder**",
-                                   description=f'{response}\n{predictions_prompt}',
-                                   colour=discord.Colour.from_rgb(129, 19, 49))
-                em.set_thumbnail(url=west_ham_logo)
-                em.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
-                await this_channel.send(embed=em)
+            em = discord.Embed(title="**Match Reminder**",
+                               description=f'{response}\n{predictions_prompt}',
+                               colour=discord.Colour.from_rgb(129, 19, 49))
+            em.set_thumbnail(url=west_ham_logo)
+            em.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
+            await this_channel.send(embed=em)
 
             print(f'Fixture 24hr reminder sent')
 
@@ -488,9 +489,9 @@ async def give_results():
             # write class to file
             await save_to_file()
 
-            for each in discord_channels:
-                this_channel = bot.get_channel(discord_channels[each])
-                await this_channel.send(response)
+            #for each in discord_channels:
+            this_channel = bot.get_channel(channel_id)
+            await this_channel.send(response)
             print(f'Prediction results sent')
             await next_fixture()
 
@@ -528,26 +529,26 @@ async def next_fixture():
 
         predictions_prompt = f'Get your predictions in now using *{command_prefix}p*'
 
-        for each in discord_channels:
-            this_channel = bot.get_channel(discord_channels[each])
-            if matchInProgress:
-                if current_is_home:
-                    response = f'**West Ham vs {next_away_team}**'
-                else:
-                    response = f'**{next_home_team} vs West Ham**'
-                em_current = discord.Embed(title="**There is a match in progress!**",
-                                           description=f'{response}',
-                                           colour=discord.Colour.from_rgb(129, 19, 49))
-                em_current.set_footer(text=f'{current_competition} ({current_competition_round})',
-                                      icon_url=current_competition_icon_url)
-                await this_channel.send(embed=em_current)
+        #for each in discord_channels:
+        this_channel = bot.get_channel(channel_id)
+        if matchInProgress:
+            if current_is_home:
+                response = f'**West Ham vs {next_away_team}**'
+            else:
+                response = f'**{next_home_team} vs West Ham**'
+            em_current = discord.Embed(title="**There is a match in progress!**",
+                                       description=f'{response}',
+                                       colour=discord.Colour.from_rgb(129, 19, 49))
+            em_current.set_footer(text=f'{current_competition} ({current_competition_round})',
+                                  icon_url=current_competition_icon_url)
+            await this_channel.send(embed=em_current)
 
-            em = discord.Embed(title="**Next Fixture**",
-                               description=f'{response}\n{predictions_prompt}',
-                               colour=discord.Colour.from_rgb(129, 19, 49))
-            em.set_thumbnail(url=west_ham_logo)
-            em.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
-            await this_channel.send(embed=em)
+        em = discord.Embed(title="**Next Fixture**",
+                           description=f'{response}\n{predictions_prompt}',
+                           colour=discord.Colour.from_rgb(129, 19, 49))
+        em.set_thumbnail(url=west_ham_logo)
+        em.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
+        await this_channel.send(embed=em)
         print(f'Next fixture information sent')
 
 
@@ -558,16 +559,16 @@ async def on_ready():
     global currentUsersClassList
     print(f'{bot.user.name} has connected to Discord!')
     results = f'{bot.user.name} has connected to Discord!'
-    await read_channel_backup()
+    #await read_channel_backup()
     bot_ready = True
     try:
         await read_from_file()
     except:
         currentUsersClassList = []
         print(f'currentUsersClass has been set to empty as file read failed')
-    for each in discord_channels:
-        this_channel = bot.get_channel(discord_channels[each])
-        await this_channel.send(results)
+    #for each in discord_channels:
+    this_channel = bot.get_channel(channel_id)
+    await this_channel.send(results)
     await set_status()
     await next_fixture()
 
