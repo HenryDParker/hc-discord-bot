@@ -173,66 +173,67 @@ async def read_channel_backup():
 # Check fixture info every hour
 @tasks.loop(minutes=30)
 async def check_fixtures():
-    # Only perform this check after 8am and stop at midnight - can be removed if necessary
-    # This will save API calls as few changes to West Ham fixture will occur between these times
-    timenow = datetime.now()
-    if timenow.hour >= 9:
-        # find today's date
-        today = date.today()
-        # set the month to an int e.g. 02
-        today_month = int(today.strftime("%m"))
-        # set the year to an int e.g. 2021
-        today_year = int(today.strftime("%Y"))
+    if bot_ready:
+        # Only perform this check after 8am and stop at midnight - can be removed if necessary
+        # This will save API calls as few changes to West Ham fixture will occur between these times
+        timenow = datetime.now()
+        if timenow.hour >= 9:
+            # find today's date
+            today = date.today()
+            # set the month to an int e.g. 02
+            today_month = int(today.strftime("%m"))
+            # set the year to an int e.g. 2021
+            today_year = int(today.strftime("%Y"))
 
-        # if the month is less than 6, set the current_season to the current year, -1 e.g in 02/2022 the season is 2021
-        if today_month < 6:
-            current_season = today_year - 1
-        else:
-            current_season = today_year
+            # if the month is less than 6, set the current_season to the current year, -1 e.g in 02/2022 the season is 2021
+            if today_month < 6:
+                current_season = today_year - 1
+            else:
+                current_season = today_year
 
-        # API call to get team fixtures for current Season
-        url_fixtures = "https://api-football-v1.p.rapidapi.com/v3/fixtures"
+            # API call to get team fixtures for current Season
+            url_fixtures = "https://api-football-v1.p.rapidapi.com/v3/fixtures"
 
-        querystring_fixtures = {"season": current_season, "team": "48"}
+            querystring_fixtures = {"season": current_season, "team": "48"}
 
-        headers_fixtures = {
-            'x-rapidapi-host': "api-football-v1.p.rapidapi.com",
-            'x-rapidapi-key': RAPIDAPIKEY
-        }
+            headers_fixtures = {
+                'x-rapidapi-host': "api-football-v1.p.rapidapi.com",
+                'x-rapidapi-key': RAPIDAPIKEY
+            }
 
-        api_response = requests.request("GET", url_fixtures, headers=headers_fixtures, params=querystring_fixtures)
-        data = api_response.text
-        fixtures_dict_json = json.loads(data)
+            api_response = requests.request("GET", url_fixtures, headers=headers_fixtures, params=querystring_fixtures)
+            data = api_response.text
+            fixtures_dict_json = json.loads(data)
 
-        try:
-            with open('fixtures_dict_json.json', 'w') as f:
-                json.dump(fixtures_dict_json, f)
-            print(f'Fixture check complete')
-        except:
-            print(f'Fixture check FAILED')
+            try:
+                with open('fixtures_dict_json.json', 'w') as f:
+                    json.dump(fixtures_dict_json, f)
+                print(f'Fixture check complete')
+            except:
+                print(f'Fixture check FAILED')
 
-        # # API call to get team info for 2021 Season
-        # url_leagues = "https://api-football-v1.p.rapidapi.com/v3/leagues"
-        #
-        # querystring_leagues = {
-        #     "season": current_season,
-        #     "team": "48"
-        # }
-        #
-        # headers_leagues = {
-        #     'x-rapidapi-host': "api-football-v1.p.rapidapi.com",
-        #     'x-rapidapi-key': RAPIDAPIKEY
-        # }
-        #
-        # api_response = requests.request("GET", url_leagues, headers=headers_leagues, params=querystring_leagues)
-        # data = api_response.text
-        # leagues_dict_json = json.loads(data)
-        #
-        # # with open('leagues_dict_json.json', 'wb') as leagues_dict_json_file:
-        # #     pickle.dump(leagues_dict_json, leagues_dict_json_file)
-        #
-        # with open('leagues_dict_json.json', 'w') as f:
-        #     json.dump(leagues_dict_json, f)
+            # # API call to get team info for 2021 Season
+            # url_leagues = "https://api-football-v1.p.rapidapi.com/v3/leagues"
+            #
+            # querystring_leagues = {
+            #     "season": current_season,
+            #     "team": "48"
+            # }
+            #
+            # headers_leagues = {
+            #     'x-rapidapi-host': "api-football-v1.p.rapidapi.com",
+            #     'x-rapidapi-key': RAPIDAPIKEY
+            # }
+            #
+            # api_response = requests.request("GET", url_leagues, headers=headers_leagues, params=querystring_leagues)
+            # data = api_response.text
+            # leagues_dict_json = json.loads(data)
+            #
+            # # with open('leagues_dict_json.json', 'wb') as leagues_dict_json_file:
+            # #     pickle.dump(leagues_dict_json, leagues_dict_json_file)
+            #
+            # with open('leagues_dict_json.json', 'w') as f:
+            #     json.dump(leagues_dict_json, f)
 
 
 @tasks.loop(minutes=10)
