@@ -846,10 +846,16 @@ async def leaderboard(ctx):
 
 
     # Format response into a table using Embed & monospaced code block
-    leaderboard_string = ("```" + "\n".join("  {}  |  {}".format(v, k) for k, v in leaderboard_dict.items()) + "```")
+    if leaderboard_dict:
+        title = "Correct Predictions"
+        leaderboard_string = ("```" + "\n".join("  {}  |  {}".format(v, k) for k, v in leaderboard_dict.items()) + "```")
+    else:
+        title = f"No one has got a prediction right yet"
+        leaderboard_string = f"See if you can be the first!"
+
 
     embed = discord.Embed(title="Top Predictors Leaderboard", colour=discord.Colour.from_rgb(129, 19, 49))
-    embed.add_field(name="Correct Predictions", value=leaderboard_string)
+    embed.add_field(name=title, value=leaderboard_string)
 
     await ctx.send(embed=embed)
     print(f'A user requested the predictions leaderboard')
