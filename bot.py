@@ -248,7 +248,8 @@ async def check_save():
 # looping every minute for testing purposes
 @tasks.loop(minutes=1)
 async def check_next_fixture():
-    print(f'Check next fixture')
+    # This was causing excessive logging - would be useful if logs were stored correctly
+    #print(f'Check next fixture')
     global matchInProgress
     with open("fixtures_dict_json.json", "r") as read_file:
         all_fixtures = json.load(read_file)
@@ -326,7 +327,7 @@ async def check_next_fixture():
                     shortest_time_diff = time_difference
                     global nextFixture
                     nextFixture = each
-                    print(f'Upcoming fixture set to nextFixture')
+                    #print(f'Upcoming fixture set to nextFixture')
 
                 else:
                     # no, continue to next fixture
