@@ -787,7 +787,7 @@ async def user_prediction(ctx, score):
             else:
                 response = "Maybe try being a little more realistic!"
         else:
-            response = "Please structure your prediction correctly e.g. 1-0 "
+            response = f"Please structure your prediction correctly e.g. *{command_prefix}p 1-0*"
 
     await ctx.send(response)
 
