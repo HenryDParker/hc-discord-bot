@@ -417,9 +417,13 @@ async def give_results():
             all_fixtures = json.load(read_file)
 
             for each in all_fixtures['response']:
+                # for each fixture, check if is the current fixture by id
                 if current_fixture_id == (each['fixture']['id']):
                     home_team = each['teams']['home']['name']
                     away_team = each['teams']['away']['name']
+                    competition = nextFixture['league']['name']
+                    competition_round = nextFixture['league']['round']
+                    competition_icon_url = nextFixture['league']['logo']
                     if (each['fixture']['status']['short']) == 'FT':
                         home_score = (each['score']['fulltime']['home'])
                         away_score = (each['score']['fulltime']['away'])
@@ -471,29 +475,40 @@ async def give_results():
 
             # Check if list is empty (no correct guesses) and print a response accordingly
             # --- unsure whether this is the correct pythonic way to check empty list
+
+            response = f'The match finished {fixture_result_full}'
+
+            em = discord.Embed(title="**Match Result**",
+                               description=f'{response}',
+                               colour=discord.Colour.from_rgb(129, 19, 49))
+
             # if correct_prediction_list is None:
             if not correct_prediction_list:
-                response = f'The match finished {fixture_result_full}\n' \
-                           f'\n' \
-                           f'Unfortunately no one guessed the score correctly!'
+                correct_guesses = f'Unfortunately no one guessed the score correctly!'
+                em.add_field(name=correct_guesses, value='Better luck next time!')
             # else there must be at least one correct prediction, so congratulate user(s) with an @Mention tag
             else:
                 correct_predictions = '\n'.join(correct_prediction_list)
-                response = f'The match finished {fixture_result_full}\n' \
-                           f'\n' \
-                           f'Well done:\n' \
-                           f'{correct_predictions}'
-            # now clear all user Objects' current predictions in the list
-            for each in currentUsersClassList:
-                each.currentPrediction = None
+                correct_guesses = f'Well done:'
+                em.add_field(name=correct_guesses, value=f'{correct_predictions}')
 
-            # write class to file
-            await save_to_file()
+            em.set_thumbnail(url=west_ham_logo)
+            em.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
+
 
             #for each in discord_channels:
             this_channel = bot.get_channel(channel_id)
-            await this_channel.send(response)
+            await this_channel.send(embed=em)
+
+            #await this_channel.send(response)
             print(f'Prediction results sent')
+
+            # now clear all user Objects' current predictions in the list
+            for each in currentUsersClassList:
+                each.currentPrediction = None
+            # write class to file
+            await save_to_file()
+
             # Send leaderboard after results given
             await leaderboard()
             await next_fixture()
