@@ -818,8 +818,10 @@ async def current_predictions(ctx):
     # Is the match at Home or Away
     if home_team == 'West Ham':
         is_home = True
+        opposition_logo = nextFixture['teams']['away']['logo']
     else:
         is_home = False
+        opposition_logo = nextFixture['teams']['home']['logo']
 
     # Combine attributes of each object in UserAndScore class into one string and add to new list
     # if not current_predictions_list:
@@ -845,7 +847,6 @@ async def current_predictions(ctx):
                        f'in the {competition} ({competition_round}), why not be the first!'
 
         embed = discord.Embed(title=response, colour=discord.Colour.from_rgb(129, 19, 49))
-        embed.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
 
     else:
 
@@ -860,7 +861,9 @@ async def current_predictions(ctx):
 
         embed = discord.Embed(title=response, colour=discord.Colour.from_rgb(129, 19, 49))
         embed.add_field(name="Current Predictions", value=predictions_string)
-        embed.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
+
+    embed.set_thumbnail(url=opposition_logo)
+    embed.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
 
     await ctx.send(embed=embed)
     print(f'A user requested upcoming match predictions')
@@ -1019,8 +1022,7 @@ async def leaderboard():
 
     embed = discord.Embed(title="Top Predictors Leaderboard", colour=discord.Colour.from_rgb(129, 19, 49))
     embed.add_field(name=title, value=leaderboard_string)
-
-
+    embed.set_thumbnail(url=west_ham_logo)
     this_channel = bot.get_channel(channel_id)
     await this_channel.send(embed=embed)
 
