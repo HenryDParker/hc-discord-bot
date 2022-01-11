@@ -4,7 +4,6 @@ import os
 import random
 import string
 import re
-
 import discord
 import requests
 import time
@@ -715,15 +714,9 @@ async def user_prediction(ctx, score):
                 for each in currentUsersClassList:
                     # if User already exists in list
                     if each.mentionName == author_mention_name:
-                        # update that user's current prediction
-                        each.currentPrediction = score
+                        # # update that user's current prediction
+                        # each.currentPrediction = score
                         each.username = author_text_name
-
-                        # write currentPredictionsClassList to a file
-                        # with open('currentPredictionsClassList.list', 'wb') as currentPredictionsClassList_file:
-                        #     pickle.dump(currentUsersClassList, currentPredictionsClassList_file)
-
-                        # await save_to_file()
 
                         # if this value is None, then prediction was reset from previous fixture
                         # and no previous prediction for this fixture has occurred
@@ -735,6 +728,8 @@ async def user_prediction(ctx, score):
                             predictions_updated = True
                             response = '_Prediction updated_\n' + random.choice(correct_score_format) \
                                        + author_mention_name + '!'
+                        # update that user's current prediction
+                        each.currentPrediction = score
                         score_added = True
                 if not score_added:
                     # add new user & score to list
@@ -755,6 +750,8 @@ async def user_prediction(ctx, score):
 
                     response = random.choice(correct_score_format) + author_mention_name + '!'
                     print(f'A user has made a prediction - {author_text_name} {score}')
+                # else:
+                #     response = "You shouldn't see this"
             else:
                 response = "Maybe try being a little more realistic!"
         else:
