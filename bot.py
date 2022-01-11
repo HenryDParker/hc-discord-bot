@@ -14,7 +14,6 @@ from discord.ext import commands, tasks
 from dotenv import load_dotenv
 from datetime import datetime, date
 from dateutil import tz
-from PIL import Image
 
 # URL to invite bot
 # https://discord.com/api/oauth2/authorize?client_id=917479797242875936&permissions=274878114880&scope=bot
