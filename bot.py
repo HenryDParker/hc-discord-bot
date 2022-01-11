@@ -72,6 +72,8 @@ matchInProgress = False
 bot_ready = False
 predictions_updated = False
 current_fixture_id = None
+reminder24hr_sent = False
+reminder1hr_sent = False
 
 west_ham_logo = "https://media.api-sports.io/football/teams/48.png"
 predictor_bot_logo = "https://i.imgur.com/9runQEU.png"
@@ -345,9 +347,13 @@ async def check_next_fixture():
 
 
 # 24hrs reminder
-@tasks.loop(minutes=60)
+@tasks.loop(minutes=1)
 async def reminder():
     if bot_ready:
+
+        global reminder24hr_sent
+        global reminder1hr_sent
+
         timenow_iso_utc = datetime.now(tz=utc_tz).isoformat(timespec='seconds')
         next_kickoff_iso_utc = nextFixture['fixture']['date']
 
@@ -360,7 +366,7 @@ async def reminder():
         day_diff = next_kickoff_utc.day - timenow_utc.day
 
         hour_diff = next_kickoff_utc.hour - timenow_utc.hour
-        # minute_diff = next_kickoff_utc.minute - timenow_utc.minute
+        minute_diff = next_kickoff_utc.minute - timenow_utc.minute
 
         # datetime is naive, so set timezone
         next_kickoff_utc = next_kickoff_utc.replace(tzinfo=utc_tz)
@@ -372,19 +378,25 @@ async def reminder():
         next_kickoff_hour = next_kickoff_uk.strftime("%H")
         next_kickoff_minute = next_kickoff_uk.strftime("%M")
 
-        if year_diff == 0 and month_diff == 0 and day_diff == 1 and hour_diff == 0:
+        next_home_team = nextFixture['teams']['home']['name']
+        next_away_team = nextFixture['teams']['away']['name']
+        competition = nextFixture['league']['name']
+        competition_round = nextFixture['league']['round']
+        competition_icon_url = nextFixture['league']['logo']
 
-            next_home_team = nextFixture['teams']['home']['name']
-            next_away_team = nextFixture['teams']['away']['name']
-            competition = nextFixture['league']['name']
-            competition_round = nextFixture['league']['round']
-            competition_icon_url = nextFixture['league']['logo']
+        if next_home_team == 'West Ham':
+            is_home = True
+            opposition_logo = nextFixture['teams']['away']['logo']
+        else:
+            is_home = False
+            opposition_logo = nextFixture['teams']['home']['logo']
 
-            if next_home_team == 'West Ham':
-                is_home = True
-            else:
-                is_home = False
+        predictions_prompt = f'Get your predictions in now using *{command_prefix}p*'
 
+        this_channel = bot.get_channel(channel_id)
+
+        if year_diff == 0 and month_diff == 0 and day_diff == 1\
+                and hour_diff == 0 and minute_diff <= 0 and not reminder24hr_sent:
             if is_home:
                 response = f'**West Ham vs {next_away_team}** starts in less than 24 hours ' \
                            f'at {next_kickoff_hour}:{next_kickoff_minute} UK Time'
@@ -392,20 +404,34 @@ async def reminder():
                 response = f'**{next_home_team} vs West Ham** starts in less than 24 hours ' \
                            f'at {next_kickoff_hour}:{next_kickoff_minute} UK Time'
 
-            predictions_prompt = f'Get your predictions in now using *{command_prefix}p*'
+            em = discord.Embed(title="**Match Reminder**",
+                               description=f'{response}\n{predictions_prompt}',
+                               colour=discord.Colour.from_rgb(129, 19, 49))
+            em.set_thumbnail(url=opposition_logo)
+            em.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
+            await this_channel.send(embed=em)
+            print(f'Fixture 24hr reminder sent')
+            reminder24hr_sent = True
 
-            #for each in discord_channels:
-            this_channel = bot.get_channel(channel_id)
-            # await this_channel.send(response)
+
+        elif year_diff == 0 and month_diff == 0 and day_diff == 0\
+                and hour_diff == 1 and minute_diff <= 0 and not reminder1hr_sent:
+            if is_home:
+                response = f'**West Ham vs {next_away_team}** starts in less than 1 hour ' \
+                           f'at {next_kickoff_hour}:{next_kickoff_minute} UK Time'
+            else:
+                response = f'**{next_home_team} vs West Ham** starts in less than 1 hour ' \
+                           f'at {next_kickoff_hour}:{next_kickoff_minute} UK Time'
 
             em = discord.Embed(title="**Match Reminder**",
                                description=f'{response}\n{predictions_prompt}',
                                colour=discord.Colour.from_rgb(129, 19, 49))
-            em.set_thumbnail(url=west_ham_logo)
+            em.set_thumbnail(url=opposition_logo)
             em.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
             await this_channel.send(embed=em)
+            print(f'Fixture 1hr reminder sent')
+            reminder1hr_sent = True
 
-            print(f'Fixture 24hr reminder sent')
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -519,6 +545,12 @@ async def give_results():
 async def next_fixture():
     if bot_ready:
         this_channel = bot.get_channel(channel_id)
+
+        # Reset reminder bools
+        global reminder24hr_sent
+        global reminder1hr_sent
+        reminder24hr_sent = False
+        reminder1hr_sent = False
 
         # Grab details for next match
         next_home_team = nextFixture['teams']['home']['name']
