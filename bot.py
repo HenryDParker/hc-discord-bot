@@ -4,6 +4,7 @@ import os
 import random
 import string
 import re
+
 import discord
 import requests
 import time
@@ -13,6 +14,7 @@ from discord.ext import commands, tasks
 from dotenv import load_dotenv
 from datetime import datetime, date
 from dateutil import tz
+from PIL import Image
 
 # URL to invite bot
 # https://discord.com/api/oauth2/authorize?client_id=917479797242875936&permissions=274878114880&scope=bot
@@ -74,6 +76,7 @@ predictions_updated = False
 current_fixture_id = None
 
 west_ham_logo = "https://media.api-sports.io/football/teams/48.png"
+predictor_bot_logo = "https://i.imgur.com/9runQEU.png"
 
 # Setting up timezones
 utc_tz = tz.gettz('UTC')
@@ -248,7 +251,8 @@ async def check_save():
 # looping every minute for testing purposes
 @tasks.loop(minutes=1)
 async def check_next_fixture():
-    print(f'Check next fixture')
+    # This was causing excessive logging - would be useful if logs were stored correctly
+    #print(f'Check next fixture')
     global matchInProgress
     with open("fixtures_dict_json.json", "r") as read_file:
         all_fixtures = json.load(read_file)
@@ -326,7 +330,7 @@ async def check_next_fixture():
                     shortest_time_diff = time_difference
                     global nextFixture
                     nextFixture = each
-                    print(f'Upcoming fixture set to nextFixture')
+                    #print(f'Upcoming fixture set to nextFixture')
 
                 else:
                     # no, continue to next fixture
@@ -416,9 +420,13 @@ async def give_results():
             all_fixtures = json.load(read_file)
 
             for each in all_fixtures['response']:
+                # for each fixture, check if is the current fixture by id
                 if current_fixture_id == (each['fixture']['id']):
                     home_team = each['teams']['home']['name']
                     away_team = each['teams']['away']['name']
+                    competition = nextFixture['league']['name']
+                    competition_round = nextFixture['league']['round']
+                    competition_icon_url = nextFixture['league']['logo']
                     if (each['fixture']['status']['short']) == 'FT':
                         home_score = (each['score']['fulltime']['home'])
                         away_score = (each['score']['fulltime']['away'])
@@ -470,35 +478,50 @@ async def give_results():
 
             # Check if list is empty (no correct guesses) and print a response accordingly
             # --- unsure whether this is the correct pythonic way to check empty list
+
+            response = f'The match finished {fixture_result_full}'
+
+            em = discord.Embed(title="**Match Result**",
+                               description=f'{response}',
+                               colour=discord.Colour.from_rgb(129, 19, 49))
+
             # if correct_prediction_list is None:
             if not correct_prediction_list:
-                response = f'The match finished {fixture_result_full}\n' \
-                           f'\n' \
-                           f'Unfortunately no one guessed the score correctly!'
+                correct_guesses = f'Unfortunately no one guessed the score correctly!'
+                em.add_field(name=correct_guesses, value='Better luck next time!')
             # else there must be at least one correct prediction, so congratulate user(s) with an @Mention tag
             else:
                 correct_predictions = '\n'.join(correct_prediction_list)
-                response = f'The match finished {fixture_result_full}\n' \
-                           f'\n' \
-                           f'Well done:\n' \
-                           f'{correct_predictions}'
-            # now clear all user Objects' current predictions in the list
-            for each in currentUsersClassList:
-                each.currentPrediction = None
+                correct_guesses = f'Well done:'
+                em.add_field(name=correct_guesses, value=f'{correct_predictions}')
 
-            # write class to file
-            await save_to_file()
+            em.set_thumbnail(url=west_ham_logo)
+            em.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
+
 
             #for each in discord_channels:
             this_channel = bot.get_channel(channel_id)
-            await this_channel.send(response)
+            await this_channel.send(embed=em)
+
+            #await this_channel.send(response)
             print(f'Prediction results sent')
+
+            # now clear all user Objects' current predictions in the list
+            for each in currentUsersClassList:
+                each.currentPrediction = None
+            # write class to file
+            await save_to_file()
+
+            # Send leaderboard after results given
+            await leaderboard()
             await next_fixture()
 
 
 @bot.event
 async def next_fixture():
     if bot_ready:
+        this_channel = bot.get_channel(channel_id)
+
         # Grab details for next match
         next_home_team = nextFixture['teams']['home']['name']
         next_away_team = nextFixture['teams']['away']['name']
@@ -506,47 +529,61 @@ async def next_fixture():
         competition_round = nextFixture['league']['round']
         competition_icon_url = nextFixture['league']['logo']
 
+        predictions_prompt = f'Get your predictions in now using *{command_prefix}p*'
+
         if matchInProgress:
             current_home_team = currentFixture['teams']['home']['name']
             current_away_team = currentFixture['teams']['away']['name']
             current_competition = currentFixture['league']['name']
             current_competition_round = currentFixture['league']['round']
             current_competition_icon_url = currentFixture['league']['logo']
+
             if current_home_team == 'West Ham':
                 current_is_home = True
+                current_away_team_icon = currentFixture['teams']['away']['logo']
+
+                response = f'**West Ham vs {next_away_team}**'
+
+                em_current = discord.Embed(title="**There is a match in progress!**",
+                                           description=f'{response}',
+                                           colour=discord.Colour.from_rgb(129, 19, 49))
             else:
                 current_is_home = False
+                current_home_team_icon = currentFixture['teams']['home']['logo']
 
-        if next_home_team == 'West Ham':
-            is_home = True
-        else:
-            is_home = False
-
-        if is_home:
-            response = f'The next fixture is **West Ham vs {next_away_team}**'
-        else:
-            response = f'The next fixture is **{next_home_team} vs West Ham**'
-
-        predictions_prompt = f'Get your predictions in now using *{command_prefix}p*'
-
-        #for each in discord_channels:
-        this_channel = bot.get_channel(channel_id)
-        if matchInProgress:
-            if current_is_home:
-                response = f'**West Ham vs {next_away_team}**'
-            else:
                 response = f'**{next_home_team} vs West Ham**'
-            em_current = discord.Embed(title="**There is a match in progress!**",
-                                       description=f'{response}',
-                                       colour=discord.Colour.from_rgb(129, 19, 49))
+
+                em_current = discord.Embed(title="**There is a match in progress!**",
+                                           description=f'{response}',
+                                           colour=discord.Colour.from_rgb(129, 19, 49))
+
             em_current.set_footer(text=f'{current_competition} ({current_competition_round})',
                                   icon_url=current_competition_icon_url)
             await this_channel.send(embed=em_current)
+            predictions_prompt = "Get your predictions in once the current match is over!"
 
-        em = discord.Embed(title="**Next Fixture**",
-                           description=f'{response}\n{predictions_prompt}',
-                           colour=discord.Colour.from_rgb(129, 19, 49))
-        em.set_thumbnail(url=west_ham_logo)
+
+        if next_home_team == 'West Ham':
+            is_home = True
+            away_team_icon = nextFixture['teams']['away']['logo']
+
+            response = f'The next fixture is **West Ham vs {next_away_team}**'
+
+            em = discord.Embed(title="**Next Fixture**",
+                               description=f'{response}\n{predictions_prompt}',
+                               colour=discord.Colour.from_rgb(129, 19, 49))
+            em.set_thumbnail(url=away_team_icon)
+        else:
+            is_home = False
+            home_team_icon = nextFixture['teams']['home']['logo']
+
+            response = f'The next fixture is **{next_home_team} vs West Ham**'
+
+            em = discord.Embed(title="**Next Fixture**",
+                               description=f'{response}\n{predictions_prompt}',
+                               colour=discord.Colour.from_rgb(129, 19, 49))
+            em.set_thumbnail(url=home_team_icon)
+
         em.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
         await this_channel.send(embed=em)
         print(f'Next fixture information sent')
@@ -592,6 +629,7 @@ async def help(ctx):
                        f"**{command_prefix}leaderboard** - Show the current leaderboard of predictors\n"
                        f"**{command_prefix}correct-scores** - Your total number of correct scores\n"
                        f"**{command_prefix}score-streak** - Your current number of correct scores in a row\n")
+    em.set_thumbnail(url=predictor_bot_logo)
     await ctx.send(embed=em)
 
 
@@ -600,6 +638,7 @@ async def p(ctx):
     em = discord.Embed(title="p", description="Add or update you score prediction for the next match",
                        colour=discord.Colour.from_rgb(129, 19, 49))
     em.add_field(name="*Syntax*", value=f"{command_prefix}p *homescore*-*awayscore*")
+    em.set_thumbnail(url=predictor_bot_logo)
     await ctx.send(embed=em)
 
 @help.command(name="predict")
@@ -609,6 +648,7 @@ async def p(ctx):
                                    f"- Add or update you score prediction for the next match",
                        colour=discord.Colour.from_rgb(129, 19, 49))
     em.add_field(name="*Syntax*", value=f"{command_prefix}predict *homescore*-*awayscore*")
+    em.set_thumbnail(url=predictor_bot_logo)
     await ctx.send(embed=em)
 
 
@@ -616,6 +656,7 @@ async def p(ctx):
 async def predictions(ctx):
     em = discord.Embed(title="predictions", description="Show all the submitted predictions for the upcoming fixture",
                        colour=discord.Colour.from_rgb(129, 19, 49))
+    em.set_thumbnail(url=predictor_bot_logo)
     await ctx.send(embed=em)
 
 
@@ -623,6 +664,7 @@ async def predictions(ctx):
 async def leaderboard(ctx):
     em = discord.Embed(title="leaderboard", description="Show the current leaderboard of the top score predictors",
                        colour=discord.Colour.from_rgb(129, 19, 49))
+    em.set_thumbnail(url=predictor_bot_logo)
     await ctx.send(embed=em)
 
 
@@ -630,6 +672,7 @@ async def leaderboard(ctx):
 async def correct_scores(ctx):
     em = discord.Embed(title="correct-scores", description="Show your total number of correct score predictions",
                        colour=discord.Colour.from_rgb(129, 19, 49))
+    em.set_thumbnail(url=predictor_bot_logo)
     await ctx.send(embed=em)
 
 
@@ -638,6 +681,7 @@ async def score_streak(ctx):
     em = discord.Embed(title="score-streak", description="Show your current number of correct score predictions"
                                                          " in a row",
                        colour=discord.Colour.from_rgb(129, 19, 49))
+    em.set_thumbnail(url=predictor_bot_logo)
     await ctx.send(embed=em)
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -782,8 +826,10 @@ async def current_predictions(ctx):
     # Is the match at Home or Away
     if home_team == 'West Ham':
         is_home = True
+        opposition_logo = nextFixture['teams']['away']['logo']
     else:
         is_home = False
+        opposition_logo = nextFixture['teams']['home']['logo']
 
     # Combine attributes of each object in UserAndScore class into one string and add to new list
     # if not current_predictions_list:
@@ -809,7 +855,6 @@ async def current_predictions(ctx):
                        f'in the {competition} ({competition_round}), why not be the first!'
 
         embed = discord.Embed(title=response, colour=discord.Colour.from_rgb(129, 19, 49))
-        embed.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
 
     else:
 
@@ -824,45 +869,18 @@ async def current_predictions(ctx):
 
         embed = discord.Embed(title=response, colour=discord.Colour.from_rgb(129, 19, 49))
         embed.add_field(name="Current Predictions", value=predictions_string)
-        embed.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
+
+    embed.set_thumbnail(url=opposition_logo)
+    embed.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
 
     await ctx.send(embed=embed)
     print(f'A user requested upcoming match predictions')
 
 
 @bot.command(name='leaderboard', help='Shows top score predictors!')
-async def leaderboard(ctx):
-    unsorted_leaderboard_dict = {}
-    for each in currentUsersClassList:
-        correct_predictions = each.numCorrectPredictions
-        username = each.username
-        unsorted_leaderboard_dict[username] = correct_predictions
-
-    leaderboard_dict = {}
-    sorted_key = sorted(unsorted_leaderboard_dict, key=unsorted_leaderboard_dict.get, reverse=True)
-    for x in sorted_key:
-        leaderboard_dict[x] = unsorted_leaderboard_dict[x]
-
-    leaderboard_dict = {k:v for k, v in leaderboard_dict.items() if v != 0}
-
-
-    # Format response into a table using Embed & monospaced code block
-    if leaderboard_dict:
-        title = "Correct Predictions"
-        leaderboard_string = ("```" + "\n".join("  {}  |  {}".format(v, k) for k, v in leaderboard_dict.items()) + "```")
-    else:
-        title = f"No one has got a prediction right yet"
-        leaderboard_string = f"See if you can be the first!"
-
-
-    embed = discord.Embed(title="Top Predictors Leaderboard", colour=discord.Colour.from_rgb(129, 19, 49))
-    embed.add_field(name=title, value=leaderboard_string)
-
-    await ctx.send(embed=embed)
+async def command_leaderboard(ctx):
+    await leaderboard()
     print(f'A user requested the predictions leaderboard')
-
-    # To sort out double digit correct predictions
-    # maybe add a white space to single digit values to match spacing of double digit values?
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -982,6 +1000,39 @@ async def read_from_file():
 
 # ----------------------------------------------------------------------------------------------------------------------
 
+    # To sort out double digit correct predictions
+    # maybe add a white space to single digit values to match spacing of double digit values?
+
+@bot.event
+async def leaderboard():
+    unsorted_leaderboard_dict = {}
+    for each in currentUsersClassList:
+        correct_predictions = each.numCorrectPredictions
+        username = each.username
+        unsorted_leaderboard_dict[username] = correct_predictions
+
+    leaderboard_dict = {}
+    sorted_key = sorted(unsorted_leaderboard_dict, key=unsorted_leaderboard_dict.get, reverse=True)
+    for x in sorted_key:
+        leaderboard_dict[x] = unsorted_leaderboard_dict[x]
+
+    leaderboard_dict = {k:v for k, v in leaderboard_dict.items() if v != 0}
+
+
+    # Format response into a table using Embed & monospaced code block
+    if leaderboard_dict:
+        title = "Correct Predictions"
+        leaderboard_string = ("```" + "\n".join("  {}  |  {}".format(v, k) for k, v in leaderboard_dict.items()) + "```")
+    else:
+        title = f"No one has got a prediction right yet"
+        leaderboard_string = f"See if you can be the first!"
+
+
+    embed = discord.Embed(title="Top Predictors Leaderboard", colour=discord.Colour.from_rgb(129, 19, 49))
+    embed.add_field(name=title, value=leaderboard_string)
+    embed.set_thumbnail(url=west_ham_logo)
+    this_channel = bot.get_channel(channel_id)
+    await this_channel.send(embed=embed)
 
 # #Api-Football - Leagues by team ID & season
 # @bot.command(name='leagues', help='Which competitions are West Ham in?')
