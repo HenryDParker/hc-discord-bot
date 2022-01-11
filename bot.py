@@ -76,6 +76,7 @@ predictions_updated = False
 current_fixture_id = None
 
 west_ham_logo = "https://media.api-sports.io/football/teams/48.png"
+predictor_bot_logo = "https://i.imgur.com/9runQEU.png"
 
 # Setting up timezones
 utc_tz = tz.gettz('UTC')
@@ -628,6 +629,7 @@ async def help(ctx):
                        f"**{command_prefix}leaderboard** - Show the current leaderboard of predictors\n"
                        f"**{command_prefix}correct-scores** - Your total number of correct scores\n"
                        f"**{command_prefix}score-streak** - Your current number of correct scores in a row\n")
+    em.set_thumbnail(url=predictor_bot_logo)
     await ctx.send(embed=em)
 
 
@@ -636,6 +638,7 @@ async def p(ctx):
     em = discord.Embed(title="p", description="Add or update you score prediction for the next match",
                        colour=discord.Colour.from_rgb(129, 19, 49))
     em.add_field(name="*Syntax*", value=f"{command_prefix}p *homescore*-*awayscore*")
+    em.set_thumbnail(url=predictor_bot_logo)
     await ctx.send(embed=em)
 
 @help.command(name="predict")
@@ -645,6 +648,7 @@ async def p(ctx):
                                    f"- Add or update you score prediction for the next match",
                        colour=discord.Colour.from_rgb(129, 19, 49))
     em.add_field(name="*Syntax*", value=f"{command_prefix}predict *homescore*-*awayscore*")
+    em.set_thumbnail(url=predictor_bot_logo)
     await ctx.send(embed=em)
 
 
@@ -652,6 +656,7 @@ async def p(ctx):
 async def predictions(ctx):
     em = discord.Embed(title="predictions", description="Show all the submitted predictions for the upcoming fixture",
                        colour=discord.Colour.from_rgb(129, 19, 49))
+    em.set_thumbnail(url=predictor_bot_logo)
     await ctx.send(embed=em)
 
 
@@ -659,6 +664,7 @@ async def predictions(ctx):
 async def leaderboard(ctx):
     em = discord.Embed(title="leaderboard", description="Show the current leaderboard of the top score predictors",
                        colour=discord.Colour.from_rgb(129, 19, 49))
+    em.set_thumbnail(url=predictor_bot_logo)
     await ctx.send(embed=em)
 
 
@@ -666,6 +672,7 @@ async def leaderboard(ctx):
 async def correct_scores(ctx):
     em = discord.Embed(title="correct-scores", description="Show your total number of correct score predictions",
                        colour=discord.Colour.from_rgb(129, 19, 49))
+    em.set_thumbnail(url=predictor_bot_logo)
     await ctx.send(embed=em)
 
 
@@ -674,6 +681,7 @@ async def score_streak(ctx):
     em = discord.Embed(title="score-streak", description="Show your current number of correct score predictions"
                                                          " in a row",
                        colour=discord.Colour.from_rgb(129, 19, 49))
+    em.set_thumbnail(url=predictor_bot_logo)
     await ctx.send(embed=em)
 
 # ----------------------------------------------------------------------------------------------------------------------
