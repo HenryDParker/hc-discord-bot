@@ -494,6 +494,8 @@ async def give_results():
             this_channel = bot.get_channel(channel_id)
             await this_channel.send(response)
             print(f'Prediction results sent')
+            # Send leaderboard after results given
+            await leaderboard()
             await next_fixture()
 
 
@@ -832,38 +834,9 @@ async def current_predictions(ctx):
 
 
 @bot.command(name='leaderboard', help='Shows top score predictors!')
-async def leaderboard(ctx):
-    unsorted_leaderboard_dict = {}
-    for each in currentUsersClassList:
-        correct_predictions = each.numCorrectPredictions
-        username = each.username
-        unsorted_leaderboard_dict[username] = correct_predictions
-
-    leaderboard_dict = {}
-    sorted_key = sorted(unsorted_leaderboard_dict, key=unsorted_leaderboard_dict.get, reverse=True)
-    for x in sorted_key:
-        leaderboard_dict[x] = unsorted_leaderboard_dict[x]
-
-    leaderboard_dict = {k:v for k, v in leaderboard_dict.items() if v != 0}
-
-
-    # Format response into a table using Embed & monospaced code block
-    if leaderboard_dict:
-        title = "Correct Predictions"
-        leaderboard_string = ("```" + "\n".join("  {}  |  {}".format(v, k) for k, v in leaderboard_dict.items()) + "```")
-    else:
-        title = f"No one has got a prediction right yet"
-        leaderboard_string = f"See if you can be the first!"
-
-
-    embed = discord.Embed(title="Top Predictors Leaderboard", colour=discord.Colour.from_rgb(129, 19, 49))
-    embed.add_field(name=title, value=leaderboard_string)
-
-    await ctx.send(embed=embed)
+async def command_leaderboard(ctx):
+    await leaderboard()
     print(f'A user requested the predictions leaderboard')
-
-    # To sort out double digit correct predictions
-    # maybe add a white space to single digit values to match spacing of double digit values?
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -983,6 +956,40 @@ async def read_from_file():
 
 # ----------------------------------------------------------------------------------------------------------------------
 
+    # To sort out double digit correct predictions
+    # maybe add a white space to single digit values to match spacing of double digit values?
+
+@bot.event
+async def leaderboard():
+    unsorted_leaderboard_dict = {}
+    for each in currentUsersClassList:
+        correct_predictions = each.numCorrectPredictions
+        username = each.username
+        unsorted_leaderboard_dict[username] = correct_predictions
+
+    leaderboard_dict = {}
+    sorted_key = sorted(unsorted_leaderboard_dict, key=unsorted_leaderboard_dict.get, reverse=True)
+    for x in sorted_key:
+        leaderboard_dict[x] = unsorted_leaderboard_dict[x]
+
+    leaderboard_dict = {k:v for k, v in leaderboard_dict.items() if v != 0}
+
+
+    # Format response into a table using Embed & monospaced code block
+    if leaderboard_dict:
+        title = "Correct Predictions"
+        leaderboard_string = ("```" + "\n".join("  {}  |  {}".format(v, k) for k, v in leaderboard_dict.items()) + "```")
+    else:
+        title = f"No one has got a prediction right yet"
+        leaderboard_string = f"See if you can be the first!"
+
+
+    embed = discord.Embed(title="Top Predictors Leaderboard", colour=discord.Colour.from_rgb(129, 19, 49))
+    embed.add_field(name=title, value=leaderboard_string)
+
+
+    this_channel = bot.get_channel(channel_id)
+    await this_channel.send(embed=embed)
 
 # #Api-Football - Leagues by team ID & season
 # @bot.command(name='leagues', help='Which competitions are West Ham in?')
