@@ -884,15 +884,18 @@ async def current_predictions(ctx):
     #                    + '\n'.join(current_predictions_list)
     # await ctx.send(response)
 
+    embed = discord.Embed(title="Current Predictions", colour=discord.Colour.from_rgb(129, 19, 49))
+
     if not current_predictions_list:
         if is_home:
             response = f'No score predictions for *West Ham vs {away_team}*\n' \
-                       f'in the {competition} ({competition_round}), why not be the first!'
+                       f'in the {competition} ({competition_round})'
         else:
             response = f'No score predictions for *{home_team} vs West Ham*\n' \
-                       f'in the {competition} ({competition_round}), why not be the first!'
+                       f'in the {competition} ({competition_round})'
 
-        embed = discord.Embed(title=response, colour=discord.Colour.from_rgb(129, 19, 49))
+        sub_header = f'Why not be the first to make a guess!'
+        embed.add_field(name=response, value=sub_header)
 
     else:
 
@@ -905,8 +908,7 @@ async def current_predictions(ctx):
             response = f'Score predictions for *{home_team} vs West Ham*\n' \
                        f'in the {competition} ({competition_round})'
 
-        embed = discord.Embed(title=response, colour=discord.Colour.from_rgb(129, 19, 49))
-        embed.add_field(name="Current Predictions", value=predictions_string)
+        embed.add_field(name=response, value=predictions_string)
 
     embed.set_thumbnail(url=opposition_logo)
     embed.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
