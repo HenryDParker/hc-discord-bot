@@ -572,7 +572,7 @@ async def next_fixture():
                 current_is_home = True
                 current_away_team_icon = currentFixture['teams']['away']['logo']
 
-                response = f'**West Ham vs {next_away_team}**'
+                response = f'**West Ham vs {current_away_team}**'
 
                 em_current = discord.Embed(title="**There is a match in progress!**",
                                            description=f'{response}',
@@ -582,7 +582,7 @@ async def next_fixture():
                 current_is_home = False
                 current_home_team_icon = currentFixture['teams']['home']['logo']
 
-                response = f'**{next_home_team} vs West Ham**'
+                response = f'**{current_home_team} vs West Ham**'
 
                 em_current = discord.Embed(title="**There is a match in progress!**",
                                            description=f'{response}',
