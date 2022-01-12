@@ -577,6 +577,7 @@ async def next_fixture():
                 em_current = discord.Embed(title="**There is a match in progress!**",
                                            description=f'{response}',
                                            colour=discord.Colour.from_rgb(129, 19, 49))
+                em_current.set_thumbnail(url=current_away_team_icon)
             else:
                 current_is_home = False
                 current_home_team_icon = currentFixture['teams']['home']['logo']
@@ -586,36 +587,37 @@ async def next_fixture():
                 em_current = discord.Embed(title="**There is a match in progress!**",
                                            description=f'{response}',
                                            colour=discord.Colour.from_rgb(129, 19, 49))
+                em_current.set_thumbnail(url=current_home_team_icon)
 
             em_current.set_footer(text=f'{current_competition} ({current_competition_round})',
                                   icon_url=current_competition_icon_url)
             await this_channel.send(embed=em_current)
             predictions_prompt = "Get your predictions in once the current match is over!"
 
-
-        if next_home_team == 'West Ham':
-            is_home = True
-            away_team_icon = nextFixture['teams']['away']['logo']
-
-            response = f'The next fixture is **West Ham vs {next_away_team}**'
-
-            em = discord.Embed(title="**Next Fixture**",
-                               description=f'{response}\n{predictions_prompt}',
-                               colour=discord.Colour.from_rgb(129, 19, 49))
-            em.set_thumbnail(url=away_team_icon)
         else:
-            is_home = False
-            home_team_icon = nextFixture['teams']['home']['logo']
+            if next_home_team == 'West Ham':
+                is_home = True
+                away_team_icon = nextFixture['teams']['away']['logo']
 
-            response = f'The next fixture is **{next_home_team} vs West Ham**'
+                response = f'The next fixture is **West Ham vs {next_away_team}**'
 
-            em = discord.Embed(title="**Next Fixture**",
-                               description=f'{response}\n{predictions_prompt}',
-                               colour=discord.Colour.from_rgb(129, 19, 49))
-            em.set_thumbnail(url=home_team_icon)
+                em = discord.Embed(title="**Next Fixture**",
+                                   description=f'{response}\n{predictions_prompt}',
+                                   colour=discord.Colour.from_rgb(129, 19, 49))
+                em.set_thumbnail(url=away_team_icon)
+            else:
+                is_home = False
+                home_team_icon = nextFixture['teams']['home']['logo']
 
-        em.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
-        await this_channel.send(embed=em)
+                response = f'The next fixture is **{next_home_team} vs West Ham**'
+
+                em = discord.Embed(title="**Next Fixture**",
+                                   description=f'{response}\n{predictions_prompt}',
+                                   colour=discord.Colour.from_rgb(129, 19, 49))
+                em.set_thumbnail(url=home_team_icon)
+
+            em.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
+            await this_channel.send(embed=em)
         print(f'Next fixture information sent')
 
 
