@@ -174,7 +174,7 @@ scorePatternHigh = re.compile('^[0-9]{1,5}-[0-9]{1,5}$')
 # Timed tasks
 # ----------------------------------------------------------------------------------------------------------------------
 # Check fixture info every hour
-@tasks.loop(minutes=30)
+@tasks.loop(minutes=15)
 async def check_fixtures():
     # Only perform this check after 8am and stop at midnight - can be removed if necessary
     # This will save API calls as few changes to West Ham fixture will occur between these times
@@ -448,9 +448,9 @@ async def give_results():
                 if current_fixture_id == (each['fixture']['id']):
                     home_team = each['teams']['home']['name']
                     away_team = each['teams']['away']['name']
-                    competition = nextFixture['league']['name']
-                    competition_round = nextFixture['league']['round']
-                    competition_icon_url = nextFixture['league']['logo']
+                    competition = each['league']['name']
+                    competition_round = each['league']['round']
+                    competition_icon_url = each['league']['logo']
                     if (each['fixture']['status']['short']) == 'FT':
                         home_score = (each['score']['fulltime']['home'])
                         away_score = (each['score']['fulltime']['away'])
@@ -503,7 +503,7 @@ async def give_results():
             # Check if list is empty (no correct guesses) and print a response accordingly
             # --- unsure whether this is the correct pythonic way to check empty list
 
-            response = f'The match finished {fixture_result_full}'
+            response = f'The match finished **{fixture_result_full}**'
 
             em = discord.Embed(title="**Match Result**",
                                description=f'{response}',
@@ -884,15 +884,18 @@ async def current_predictions(ctx):
     #                    + '\n'.join(current_predictions_list)
     # await ctx.send(response)
 
+    embed = discord.Embed(title="Current Predictions", colour=discord.Colour.from_rgb(129, 19, 49))
+
     if not current_predictions_list:
         if is_home:
             response = f'No score predictions for *West Ham vs {away_team}*\n' \
-                       f'in the {competition} ({competition_round}), why not be the first!'
+                       f'in the {competition} ({competition_round})'
         else:
             response = f'No score predictions for *{home_team} vs West Ham*\n' \
-                       f'in the {competition} ({competition_round}), why not be the first!'
+                       f'in the {competition} ({competition_round})'
 
-        embed = discord.Embed(title=response, colour=discord.Colour.from_rgb(129, 19, 49))
+        sub_header = f'Why not be the first to make a guess!'
+        embed.add_field(name=response, value=sub_header)
 
     else:
 
@@ -905,20 +908,19 @@ async def current_predictions(ctx):
             response = f'Score predictions for *{home_team} vs West Ham*\n' \
                        f'in the {competition} ({competition_round})'
 
-        embed = discord.Embed(title=response, colour=discord.Colour.from_rgb(129, 19, 49))
-        embed.add_field(name="Current Predictions", value=predictions_string)
+        embed.add_field(name=response, value=predictions_string)
 
     embed.set_thumbnail(url=opposition_logo)
     embed.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
 
     await ctx.send(embed=embed)
-    print(f'A user requested upcoming match predictions')
+    print(f'A user ({ctx.message.author}) requested upcoming match predictions')
 
 
 @bot.command(name='leaderboard', help='Shows top score predictors!')
 async def command_leaderboard(ctx):
     await leaderboard()
-    print(f'A user requested the predictions leaderboard')
+    print(f'A user ({ctx.message.author}) requested the predictions leaderboard')
 
 
 # ----------------------------------------------------------------------------------------------------------------------
