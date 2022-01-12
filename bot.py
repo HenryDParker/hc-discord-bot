@@ -861,6 +861,14 @@ async def current_predictions(ctx):
         is_home = False
         opposition_logo = nextFixture['teams']['home']['logo']
 
+    if matchInProgress:
+        if home_team == 'West Ham':
+            is_home = True
+            opposition_logo = currentFixture['teams']['away']['logo']
+        else:
+            is_home = False
+            opposition_logo = currentFixture['teams']['home']['logo']
+
     # Combine attributes of each object in UserAndScore class into one string and add to new list
     # if not current_predictions_list:
     #     if is_home:
