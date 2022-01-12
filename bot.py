@@ -174,7 +174,7 @@ scorePatternHigh = re.compile('^[0-9]{1,5}-[0-9]{1,5}$')
 # Timed tasks
 # ----------------------------------------------------------------------------------------------------------------------
 # Check fixture info every hour
-@tasks.loop(minutes=30)
+@tasks.loop(minutes=15)
 async def check_fixtures():
     # Only perform this check after 8am and stop at midnight - can be removed if necessary
     # This will save API calls as few changes to West Ham fixture will occur between these times
