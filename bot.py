@@ -448,9 +448,9 @@ async def give_results():
                 if current_fixture_id == (each['fixture']['id']):
                     home_team = each['teams']['home']['name']
                     away_team = each['teams']['away']['name']
-                    competition = nextFixture['league']['name']
-                    competition_round = nextFixture['league']['round']
-                    competition_icon_url = nextFixture['league']['logo']
+                    competition = each['league']['name']
+                    competition_round = each['league']['round']
+                    competition_icon_url = each['league']['logo']
                     if (each['fixture']['status']['short']) == 'FT':
                         home_score = (each['score']['fulltime']['home'])
                         away_score = (each['score']['fulltime']['away'])
@@ -503,7 +503,7 @@ async def give_results():
             # Check if list is empty (no correct guesses) and print a response accordingly
             # --- unsure whether this is the correct pythonic way to check empty list
 
-            response = f'The match finished {fixture_result_full}'
+            response = f'The match finished **{fixture_result_full}**'
 
             em = discord.Embed(title="**Match Result**",
                                description=f'{response}',
@@ -912,13 +912,13 @@ async def current_predictions(ctx):
     embed.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
 
     await ctx.send(embed=embed)
-    print(f'A user requested upcoming match predictions')
+    print(f'A user ({ctx.message.author}) requested upcoming match predictions')
 
 
 @bot.command(name='leaderboard', help='Shows top score predictors!')
 async def command_leaderboard(ctx):
     await leaderboard()
-    print(f'A user requested the predictions leaderboard')
+    print(f'A user ({ctx.message.author}) requested the predictions leaderboard')
 
 
 # ----------------------------------------------------------------------------------------------------------------------
