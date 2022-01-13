@@ -38,6 +38,7 @@ class UserAndScore:
                  mentionName: str,
                  username: str,
                  currentPrediction,
+                 predictionTimestamp,
                  numCorrectPredictions: int,
                  previousPredictionCorrect: bool,
                  predictionStreak: int,
@@ -45,6 +46,7 @@ class UserAndScore:
         self.mentionName = mentionName
         self.username = username
         self.currentPrediction = currentPrediction
+        self.predictionTimestamp = predictionTimestamp
         self.numCorrectPredictions = numCorrectPredictions
         self.previousPredictionCorrect = previousPredictionCorrect
         self.predictionStreak = predictionStreak
@@ -751,6 +753,7 @@ async def user_prediction(ctx, score):
                         # # update that user's current prediction
                         # each.currentPrediction = score
                         each.username = author_text_name
+                        each.predictionTimestamp = current_time
 
                         # if this value is None, then prediction was reset from previous fixture
                         # and no previous prediction for this fixture has occurred
@@ -769,7 +772,7 @@ async def user_prediction(ctx, score):
                     # add new user & score to list
                     # new_user is an object of UserAndScore class with name and currentPrediction inside
                     # (more attributes to be added & set to 0/null)
-                    new_user = UserAndScore(author_mention_name, author_text_name, score, 0, False, 0, 0)
+                    new_user = UserAndScore(author_mention_name, author_text_name, score, current_time, 0, False, 0, 0)
                     currentUsersClassList.append(new_user)
                     predictions_updated = True
 
@@ -784,12 +787,16 @@ async def user_prediction(ctx, score):
 
                     response = random.choice(correct_score_format) + author_mention_name + '!'
                     print(f'A user has made a prediction - {author_text_name} {score}')
+
+                currentUsersClassList.sort(key=lambda x: x.predictionTimestamp)
+                print(f'currentUsersClassList sorted')
                 # else:
                 #     response = "You shouldn't see this"
             else:
                 response = "Maybe try being a little more realistic!"
         else:
             response = f"Please structure your prediction correctly e.g. *{command_prefix}p 1-0*"
+
 
     await ctx.send(response)
 
