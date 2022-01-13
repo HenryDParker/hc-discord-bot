@@ -788,8 +788,6 @@ async def user_prediction(ctx, score):
                     response = random.choice(correct_score_format) + author_mention_name + '!'
                     print(f'A user has made a prediction - {author_text_name} {score}')
 
-                currentUsersClassList.sort(key=lambda x: x.predictionTimestamp)
-                print(f'currentUsersClassList sorted')
                 # else:
                 #     response = "You shouldn't see this"
             else:
@@ -1053,7 +1051,13 @@ async def read_from_file():
 @bot.event
 async def leaderboard():
     unsorted_leaderboard_dict = {}
-    for each in currentUsersClassList:
+    leaderboardUsersClassList = currentUsersClassList
+
+    # Sort leaderboardUsersClassList by timestamp, so first prediction is at the top of the printout
+    leaderboardUsersClassList.sort(key=lambda x: x.predictionTimestamp)
+    print(f'leaderboardUsersClassList sorted')
+
+    for each in leaderboardUsersClassList:
         correct_predictions = each.numCorrectPredictions
         username = each.username
         unsorted_leaderboard_dict[username] = correct_predictions
