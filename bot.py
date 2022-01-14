@@ -820,7 +820,7 @@ async def correct_scores(ctx):
                 response = f'You have correctly predicted {each.numCorrectPredictions} result(s).'
             break
     await ctx.send(response)
-    print(f'A user requested their correct_scores')
+    print(f'A user ({ctx.message.author}) requested their correct_scores')
 
 
 @bot.command(name='score-streak', help='Check your current number of correct guesses in a row!')
@@ -839,7 +839,7 @@ async def score_streak(ctx):
                 response = f'Your current streak is {each.predictionStreak} correct predictions in a row!'
             break
     await ctx.send(response)
-    print(f'A user requested their score_streak')
+    print(f'A user ({ctx.message.author}) requested their score_streak')
 
 
 @bot.command(name='predictions', help='Show all upcoming or current match predictions!')
@@ -944,7 +944,7 @@ async def command_leaderboard(ctx):
 @commands.has_permissions(administrator=True)
 async def admintest(ctx):
     await ctx.send('You have admin rights')
-    print(f'admintest run in {ctx.guild.name} - {ctx.guild.id}')
+    print(f'admintest run in {ctx.guild.name} ({ctx.guild.id}) by {ctx.message.author}')
 
 
 # At the moment, this function will clear the User Objects, so all current predictions and any scoreboard rating
@@ -958,7 +958,7 @@ async def clear_users(ctx):
     await save_to_file()
     await ctx.send('Files have been cleared')
 
-    print(f'Clear_Users run in {ctx.guild.name} - {ctx.guild.id}')
+    print(f'Clear_Users run in {ctx.guild.name} ({ctx.guild.id}) by {ctx.message.author}')
 
 
 @bot.command(name='force-backup', help='Admin Only - Force a file backup of the users')
@@ -967,7 +967,7 @@ async def force_backup(ctx):
     await save_to_file()
     await ctx.send('Users backed up to file')
 
-    print(f'Force backup run in {ctx.guild.name} - {ctx.guild.id}')
+    print(f'Force backup run in {ctx.guild.name} ({ctx.guild.id}) by {ctx.message.author}')
 
 
 # Writing and reading Users to Github as storage
