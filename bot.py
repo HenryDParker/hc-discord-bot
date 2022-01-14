@@ -283,69 +283,72 @@ async def check_next_fixture():
                         current_fixture_id = None
                         currentFixture = {}
                         break
+        try:
+            for each in all_fixtures['response']:
+                # get fixture timestamp
+                fixture_time = (each['fixture']['timestamp'])
+                # get fixture status
+                fixture_status = (each['fixture']['status']['short'])
 
-        for each in all_fixtures['response']:
-            # get fixture timestamp
-            fixture_time = (each['fixture']['timestamp'])
-            # get fixture status
-            fixture_status = (each['fixture']['status']['short'])
+                time_difference = fixture_time - current_time
 
-            time_difference = fixture_time - current_time
-
-            # check if difference is negative (fixture is before now) - if yes, skip to next for loop iteration
-            # if time_difference <= 0:
-            # check if fixture status is Full Time (or other finished) - if yes, skip to next for loop iteration
-            if fixture_status == 'FT' \
-                    or fixture_status == 'AET' \
-                    or fixture_status == 'PEN' \
-                    or fixture_status == 'PST' \
-                    or fixture_status == 'CANC' \
-                    or fixture_status == 'ABD' \
-                    or fixture_status == 'AWD' \
-                    or fixture_status == 'WO':
-                # check if previous iteration had a match in progress
-                continue
-
-            # else check if fixture status is in progress
-            elif fixture_status == '1H' \
-                    or fixture_status == 'HT' \
-                    or fixture_status == '2H' \
-                    or fixture_status == 'ET' \
-                    or fixture_status == 'P' \
-                    or fixture_status == 'BT' \
-                    or fixture_status == 'LIVE' \
-                    or fixture_status == 'INT':
-                matchInProgress = True
-                # get fixture id
-                current_fixture_id = (each['fixture']['id'])
-                currentFixture = each
-                print(f'Match in progress is set to currentFixture')
-                continue
-
-            # else check if fixture status is not started
-            elif fixture_status == 'NS':
-                # if not matchInProgress:
-
-                # is time to fixture less than the current shortest time to fixture?
-                if time_difference < shortest_time_diff:
-                    # yes, set as new shortest time and set as nextFixture
-                    shortest_time_diff = time_difference
-                    global nextFixture
-                    nextFixture = each
-                    #print(f'Upcoming fixture set to nextFixture')
-
-                else:
-                    # no, continue to next fixture
+                # check if difference is negative (fixture is before now) - if yes, skip to next for loop iteration
+                # if time_difference <= 0:
+                # check if fixture status is Full Time (or other finished) - if yes, skip to next for loop iteration
+                if fixture_status == 'FT' \
+                        or fixture_status == 'AET' \
+                        or fixture_status == 'PEN' \
+                        or fixture_status == 'PST' \
+                        or fixture_status == 'CANC' \
+                        or fixture_status == 'ABD' \
+                        or fixture_status == 'AWD' \
+                        or fixture_status == 'WO':
+                    # check if previous iteration had a match in progress
                     continue
 
-            # TBD, SUSP, INT
-            else:
-                # check if previous iteration had a match in progress
-                if matchInProgress:
-                    await give_results()
-                    matchInProgress = False
-                    print(f'Match in progress is TBD, SUSP or INT')
-                continue
+                # else check if fixture status is in progress
+                elif fixture_status == '1H' \
+                        or fixture_status == 'HT' \
+                        or fixture_status == '2H' \
+                        or fixture_status == 'ET' \
+                        or fixture_status == 'P' \
+                        or fixture_status == 'BT' \
+                        or fixture_status == 'LIVE' \
+                        or fixture_status == 'INT':
+                    matchInProgress = True
+                    # get fixture id
+                    current_fixture_id = (each['fixture']['id'])
+                    currentFixture = each
+                    print(f'Match in progress is set to currentFixture')
+                    continue
+
+                # else check if fixture status is not started
+                elif fixture_status == 'NS':
+                    # if not matchInProgress:
+
+                    # is time to fixture less than the current shortest time to fixture?
+                    if time_difference < shortest_time_diff:
+                        # yes, set as new shortest time and set as nextFixture
+                        shortest_time_diff = time_difference
+                        global nextFixture
+                        nextFixture = each
+                        #print(f'Upcoming fixture set to nextFixture')
+
+                    else:
+                        # no, continue to next fixture
+                        continue
+
+                # TBD, SUSP, INT
+                else:
+                    # check if previous iteration had a match in progress
+                    if matchInProgress:
+                        await give_results()
+                        matchInProgress = False
+                        print(f'Match in progress is TBD, SUSP or INT')
+                    continue
+        except KeyError:
+            print(f'Cannot find fixture info - all_fixtures dict')
+
 
 
 # 24hrs reminder
