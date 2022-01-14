@@ -267,22 +267,26 @@ async def check_next_fixture():
         global currentFixture
         global current_fixture_id
 
-        if current_fixture_id is not None:
-            for each in all_fixtures['response']:
-                if each['fixture']['id'] == current_fixture_id:
-                    if each['fixture']['status']['short'] == 'FT' \
-                            or each['fixture']['status']['short'] == 'AET' \
-                            or each['fixture']['status']['short'] == 'PEN' \
-                            or each['fixture']['status']['short'] == 'PST' \
-                            or each['fixture']['status']['short'] == 'CANC' \
-                            or each['fixture']['status']['short'] == 'ABD' \
-                            or each['fixture']['status']['short'] == 'AWD' \
-                            or each['fixture']['status']['short'] == 'WO':
-                        print(f'Current fixture has a Full Time status')
-                        await give_results()
-                        current_fixture_id = None
-                        currentFixture = {}
-                        break
+        try:
+            if current_fixture_id is not None:
+                for each in all_fixtures['response']:
+                    if each['fixture']['id'] == current_fixture_id:
+                        if each['fixture']['status']['short'] == 'FT' \
+                                or each['fixture']['status']['short'] == 'AET' \
+                                or each['fixture']['status']['short'] == 'PEN' \
+                                or each['fixture']['status']['short'] == 'PST' \
+                                or each['fixture']['status']['short'] == 'CANC' \
+                                or each['fixture']['status']['short'] == 'ABD' \
+                                or each['fixture']['status']['short'] == 'AWD' \
+                                or each['fixture']['status']['short'] == 'WO':
+                            print(f'Current fixture has a Full Time status')
+                            await give_results()
+                            current_fixture_id = None
+                            currentFixture = {}
+                            break
+        except KeyError:
+            print(f'Cannot find fixture info - current_fixture_id - all_fixtures dict')
+
         try:
             for each in all_fixtures['response']:
                 # get fixture timestamp
