@@ -271,19 +271,33 @@ async def check_next_fixture():
             if current_fixture_id is not None:
                 for each in all_fixtures['response']:
                     if each['fixture']['id'] == current_fixture_id:
-                        if each['fixture']['status']['short'] == 'FT' \
-                                or each['fixture']['status']['short'] == 'AET' \
-                                or each['fixture']['status']['short'] == 'PEN' \
-                                or each['fixture']['status']['short'] == 'PST' \
-                                or each['fixture']['status']['short'] == 'CANC' \
-                                or each['fixture']['status']['short'] == 'ABD' \
-                                or each['fixture']['status']['short'] == 'AWD' \
-                                or each['fixture']['status']['short'] == 'WO':
+                        fixture_status = (each['fixture']['status']['short'])
+
+                        # check if the current fixture id has a Full Time status
+                        if fixture_status == 'FT' or fixture_status == 'AET' or fixture_status == 'PEN':
                             print(f'Current fixture has a Full Time status')
                             await give_results()
                             current_fixture_id = None
                             currentFixture = {}
                             break
+
+                        elif fixture_status == 'AWD' or fixture_status == 'WO':
+                            # Match awarded technical loss or walkover - result is null and score streaks are maintained
+                            await null_result(fixture_status)
+                            current_fixture_id = None
+                            currentFixture = {}
+                            break
+
+                        elif fixture_status == 'ABD':
+                            # Match abandoned - result is null and  score streaks are maintained
+                            print(f'Current fixture was Abandoned - {fixture_status}')
+
+                            await null_result(fixture_status)
+                            current_fixture_id = None
+                            currentFixture = {}
+                            break
+
+
         except KeyError:
             await save_error_to_file(all_fixtures)
             print(f'Cannot find fixture info - current_fixture_id - all_fixtures dict')
@@ -343,14 +357,20 @@ async def check_next_fixture():
                         # no, continue to next fixture
                         continue
 
-                # TBD, SUSP, INT
-                else:
-                    # check if previous iteration had a match in progress
-                    if matchInProgress:
-                        await give_results()
-                        matchInProgress = False
-                        print(f'Match in progress is TBD, SUSP or INT')
-                    continue
+                # # TBD, SUSP, INT
+                # else:
+                #     # check if previous iteration had a match in progress
+                #     if matchInProgress:
+                #         await give_results()
+                #         matchInProgress = False
+                #         print(f'Match in progress is TBD, SUSP or INT')
+                #     continue
+
+                next_fixture_status = nextFixture['fixture']['status']['short']
+                if next_fixture_status == "CANC" or next_fixture_status == "PST":
+                    await postponed_fixture(next_fixture_status)
+
+
         except KeyError:
             await save_error_to_file(all_fixtures)
             print(f'Cannot find fixture info - all_fixtures dict')
@@ -550,6 +570,65 @@ async def give_results():
             # Send leaderboard after results given
             await leaderboard()
             await next_fixture()
+
+
+@bot.event
+async def null_result(null_fixture_status):
+    global matchInProgress
+    # match no longer in progress
+    matchInProgress = False
+
+    # clear current predictions as predictions are nullified
+    for each in currentUsersClassList:
+        each.currentPrediction = None
+    # write class to file
+    await save_to_file()
+
+    match null_fixture_status:
+        case 'ABD':
+            response = f'The match was abandoned'
+        case 'AWD':
+            response = f'The match was a technical loss'
+        case 'WO':
+            response = f'The match was a walkover'
+        case _:
+            response = f'The match finished for unknown reasons'
+
+    em = discord.Embed(title="**Match Result**",
+                       description=f'{response}',
+                       colour=discord.Colour.from_rgb(129, 19, 49))
+
+    title = f'To maintain fairness'
+    subtitle = f'Predictions have been nullified and score streaks are maintained'
+    em.add_field(name=title, value=subtitle)
+
+    await next_fixture()
+
+@bot.event
+async def postponed_fixture(postponed_fixture_status):
+
+    for each in currentUsersClassList:
+        each.currentPrediction = None
+    # write class to file
+    await save_to_file()
+
+    match postponed_fixture_status:
+        case 'PST':
+            response = f'The upcoming match has been postponed'
+        case 'CANC':
+            response = f'The upcoming match has been cancelled'
+        case _:
+            response = f'The upcoming match will not go ahead for unknown reasons'
+
+    em = discord.Embed(title="**Match Info**",
+                       description=f'{response}',
+                       colour=discord.Colour.from_rgb(129, 19, 49))
+
+    title = f'To maintain fairness'
+    subtitle = f'Predictions have been nullified and score streaks are maintained'
+    em.add_field(name=title, value=subtitle)
+
+    await next_fixture()
 
 
 @bot.event
