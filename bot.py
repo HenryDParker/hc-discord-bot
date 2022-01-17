@@ -285,6 +285,7 @@ async def check_next_fixture():
                             currentFixture = {}
                             break
         except KeyError:
+            await save_error_to_file(all_fixtures)
             print(f'Cannot find fixture info - current_fixture_id - all_fixtures dict')
 
         try:
@@ -351,6 +352,7 @@ async def check_next_fixture():
                         print(f'Match in progress is TBD, SUSP or INT')
                     continue
         except KeyError:
+            await save_error_to_file(all_fixtures)
             print(f'Cannot find fixture info - all_fixtures dict')
 
 
@@ -650,7 +652,8 @@ async def on_ready():
     # Commented out the message in discord to avoid spam as Heroku restarts applications once a day
     # await this_channel.send(results)
     await set_status()
-    await next_fixture()
+    # Commented out the next_fixture in discord to avoid spam as Heroku restarts applications once a day
+    # await next_fixture()
 
 
 # Set bot status
@@ -937,6 +940,11 @@ async def command_leaderboard(ctx):
     print(f'A user ({ctx.message.author}) requested the predictions leaderboard')
 
 
+@bot.command(name='next-fixture', help='Show the next fixture information')
+async def command_next_fixture(ctx):
+    await next_fixture()
+
+
 # ----------------------------------------------------------------------------------------------------------------------
 
 
@@ -1052,6 +1060,41 @@ async def read_from_file():
     except json.decoder.JSONDecodeError:
         currentUsersClassList.clear()
         print(f'Users save to file FAILED - or empty file')
+
+
+async def save_error_to_file(error_string):
+    data = error_string
+
+    json_string = json.dumps(data)
+    github = Github(GITHUBTOKEN)
+    repository = github.get_user().get_repo('hc-bot-memory')
+    filename = 'all_fixtures.json'
+    contents = repository.get_contents("")
+    all_files = []
+
+    # check all values in contents
+    while contents:
+        # take first value as file_content
+        file_content = contents.pop(0)
+        # if file_content is a directory (shouldn't ever be)
+        if file_content.type == "dir":
+            contents.extend(repository.get_contents(file_content.path))
+        # else must be a file
+        else:
+            file = file_content
+            # remove extra text to create clean file name for comparison
+            all_files.append(str(file).replace('ContentFile(path="', '').replace('")', ''))
+
+    # check if filename matches in all_files list - if yes then update, if no then create
+    try:
+        if filename in all_files:
+            contents = repository.get_contents(filename)
+            repository.update_file(filename, "Updated all_fixtures error file", json_string, contents.sha)
+        else:
+            repository.create_file(filename, "Created all_fixtures error file", json_string)
+        print(f'all_fixtures error save to file successful')
+    except:
+        print(f'all_fixtures error save to file FAILED')
 
 
 # ----------------------------------------------------------------------------------------------------------------------
