@@ -181,7 +181,7 @@ async def check_fixtures():
     # Only perform this check after 8am and stop at midnight - can be removed if necessary
     # This will save API calls as few changes to West Ham fixture will occur between these times
     timenow = datetime.now()
-    if timenow.hour >= 1:
+    if timenow.hour >= 9:
         # find today's date
         today = date.today()
         # set the month to an int e.g. 02
