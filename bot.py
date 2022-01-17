@@ -181,7 +181,7 @@ async def check_fixtures():
     # Only perform this check after 8am and stop at midnight - can be removed if necessary
     # This will save API calls as few changes to West Ham fixture will occur between these times
     timenow = datetime.now()
-    if timenow.hour >= 9:
+    if timenow.hour >= 1:
         # find today's date
         today = date.today()
         # set the month to an int e.g. 02
@@ -671,7 +671,7 @@ async def help(ctx):
                        colour=discord.Colour.from_rgb(129, 19, 49))
     em.add_field(name="Commands",
                  value=f"**{command_prefix}p** or **{command_prefix}predict** - Add or update your score prediction\n"
-                       f"**{command_prefix}next-fixture** - Show the next fixture information"
+                       f"**{command_prefix}next-fixture** - Show the next fixture information\n"
                        f"**{command_prefix}predictions** - Show the predictions for the upcoming fixture\n"
                        f"**{command_prefix}leaderboard** - Show the current leaderboard of predictors\n"
                        f"**{command_prefix}correct-scores** - Your total number of correct scores\n"
