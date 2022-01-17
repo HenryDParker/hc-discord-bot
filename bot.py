@@ -283,14 +283,16 @@ async def check_next_fixture():
 
                         elif fixture_status == 'AWD' or fixture_status == 'WO':
                             # Match awarded technical loss or walkover - result is null and score streaks are maintained
+                            print(f'Current fixture - {fixture_status}')
+
                             await null_result(fixture_status)
                             current_fixture_id = None
                             currentFixture = {}
                             break
 
-                        elif fixture_status == 'ABD':
+                        elif fixture_status == 'ABD' or fixture_status == 'PST':
                             # Match abandoned - result is null and  score streaks are maintained
-                            print(f'Current fixture was Abandoned - {fixture_status}')
+                            print(f'Current fixture - {fixture_status}')
 
                             await null_result(fixture_status)
                             current_fixture_id = None
@@ -333,7 +335,8 @@ async def check_next_fixture():
                         or fixture_status == 'P' \
                         or fixture_status == 'BT' \
                         or fixture_status == 'LIVE' \
-                        or fixture_status == 'INT':
+                        or fixture_status == 'INT'\
+                        or fixture_status == 'SUSP':
                     matchInProgress = True
                     # get fixture id
                     current_fixture_id = (each['fixture']['id'])
@@ -366,9 +369,10 @@ async def check_next_fixture():
                 #         print(f'Match in progress is TBD, SUSP or INT')
                 #     continue
 
-                next_fixture_status = nextFixture['fixture']['status']['short']
-                if next_fixture_status == "CANC" or next_fixture_status == "PST":
-                    await postponed_fixture(next_fixture_status)
+            next_fixture_status = nextFixture['fixture']['status']['short']
+
+            if next_fixture_status == "CANC" or next_fixture_status == "PST":
+                await postponed_fixture(next_fixture_status)
 
 
         except KeyError:
@@ -584,15 +588,14 @@ async def null_result(null_fixture_status):
     # write class to file
     await save_to_file()
 
-    match null_fixture_status:
-        case 'ABD':
-            response = f'The match was abandoned'
-        case 'AWD':
-            response = f'The match was a technical loss'
-        case 'WO':
-            response = f'The match was a walkover'
-        case _:
-            response = f'The match finished for unknown reasons'
+    if null_fixture_status == 'ABD':
+        response = f'The match was abandoned'
+    elif null_fixture_status == 'AWD':
+        response = f'The match was a technical loss'
+    elif null_fixture_status == 'WO':
+        response = f'The match was a walkover'
+    else:
+        response = f'The match finished for unknown reasons'
 
     em = discord.Embed(title="**Match Result**",
                        description=f'{response}',
@@ -612,13 +615,12 @@ async def postponed_fixture(postponed_fixture_status):
     # write class to file
     await save_to_file()
 
-    match postponed_fixture_status:
-        case 'PST':
-            response = f'The upcoming match has been postponed'
-        case 'CANC':
-            response = f'The upcoming match has been cancelled'
-        case _:
-            response = f'The upcoming match will not go ahead for unknown reasons'
+    if postponed_fixture_status == 'PST':
+        response = f'The upcoming match has been postponed'
+    elif postponed_fixture_status == 'CANC':
+        response = f'The upcoming match has been cancelled'
+    else:
+        response = f'The upcoming match will not go ahead for unknown reasons'
 
     em = discord.Embed(title="**Match Info**",
                        description=f'{response}',
