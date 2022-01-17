@@ -766,6 +766,9 @@ async def user_prediction(ctx, score):
                 author_mention_name = format(ctx.message.author.mention)
                 author_text_name = format(ctx.message.author)
 
+                home_team = nextFixture['teams']['home']['name']
+                away_team = nextFixture['teams']['away']['name']
+
                 score_added = False
                 # Check if user already has a predictions - if yes, update it
                 # for each UserAndScore object in List
@@ -782,11 +785,13 @@ async def user_prediction(ctx, score):
                         # to be used for Score Streak in Future Feature
                         if each.currentPrediction is None:
                             predictions_updated = True
-                            response = random.choice(correct_score_format) + author_mention_name + '!'
+                            response = f"You have predicted {home_team} {score} {away_team}\n"\
+                                       + random.choice(correct_score_format) + author_mention_name + '!'
                         else:
                             predictions_updated = True
-                            response = '_Prediction updated_\n' + random.choice(correct_score_format) \
-                                       + author_mention_name + '!'
+                            response = '_Prediction updated_\n'\
+                                       f"You have predicted {home_team} {score} {away_team}\n"\
+                                       + random.choice(correct_score_format) + author_mention_name + '!'
                         # update that user's current prediction
                         each.currentPrediction = score
                         score_added = True
@@ -807,7 +812,9 @@ async def user_prediction(ctx, score):
                     # json.dumps(currentUsersClassList, indent=2)
                     # json.dump(currentUsersClassList, f, indent=2)
 
-                    response = random.choice(correct_score_format) + author_mention_name + '!'
+                    response = f"You have predicted {home_team} {score} {away_team}\n"\
+                               + random.choice(correct_score_format) + author_mention_name + '!'
+
                     print(f'A user has made a prediction - {author_text_name} {score}')
 
                 # else:
