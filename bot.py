@@ -285,6 +285,7 @@ async def check_next_fixture():
                             currentFixture = {}
                             break
         except KeyError:
+            await save_error_to_file(all_fixtures)
             print(f'Cannot find fixture info - current_fixture_id - all_fixtures dict')
 
         try:
@@ -351,6 +352,7 @@ async def check_next_fixture():
                         print(f'Match in progress is TBD, SUSP or INT')
                     continue
         except KeyError:
+            await save_error_to_file(all_fixtures)
             print(f'Cannot find fixture info - all_fixtures dict')
 
 
@@ -636,7 +638,8 @@ async def on_ready():
     global bot_ready
     global currentUsersClassList
     print(f'{bot.user.name} has connected to Discord!')
-    results = f'{bot.user.name} has connected to Discord!'
+    # Commented out the message in discord to avoid spam as Heroku restarts applications once a day
+    # results = f'{bot.user.name} has connected to Discord!'
     #await read_channel_backup()
     bot_ready = True
     try:
@@ -646,9 +649,11 @@ async def on_ready():
         print(f'currentUsersClass has been set to empty as file read failed')
     #for each in discord_channels:
     this_channel = bot.get_channel(channel_id)
-    await this_channel.send(results)
+    # Commented out the message in discord to avoid spam as Heroku restarts applications once a day
+    # await this_channel.send(results)
     await set_status()
-    await next_fixture()
+    # Commented out the next_fixture in discord to avoid spam as Heroku restarts applications once a day
+    # await next_fixture()
 
 
 # Set bot status
@@ -666,6 +671,7 @@ async def help(ctx):
                        colour=discord.Colour.from_rgb(129, 19, 49))
     em.add_field(name="Commands",
                  value=f"**{command_prefix}p** or **{command_prefix}predict** - Add or update your score prediction\n"
+                       f"**{command_prefix}next-fixture** - Show the next fixture information"
                        f"**{command_prefix}predictions** - Show the predictions for the upcoming fixture\n"
                        f"**{command_prefix}leaderboard** - Show the current leaderboard of predictors\n"
                        f"**{command_prefix}correct-scores** - Your total number of correct scores\n"
@@ -725,6 +731,15 @@ async def score_streak(ctx):
     em.set_thumbnail(url=predictor_bot_logo)
     await ctx.send(embed=em)
 
+
+@help.command(name="next-fixture")
+async def next_fixture(ctx):
+    em = discord.Embed(title="next-fixture", description="Show the next fixture information",
+                       colour=discord.Colour.from_rgb(129, 19, 49))
+    em.set_thumbnail(url=predictor_bot_logo)
+    await ctx.send(embed=em)
+
+
 # ----------------------------------------------------------------------------------------------------------------------
 
 
@@ -751,6 +766,9 @@ async def user_prediction(ctx, score):
                 author_mention_name = format(ctx.message.author.mention)
                 author_text_name = format(ctx.message.author)
 
+                home_team = nextFixture['teams']['home']['name']
+                away_team = nextFixture['teams']['away']['name']
+
                 score_added = False
                 # Check if user already has a predictions - if yes, update it
                 # for each UserAndScore object in List
@@ -767,11 +785,13 @@ async def user_prediction(ctx, score):
                         # to be used for Score Streak in Future Feature
                         if each.currentPrediction is None:
                             predictions_updated = True
-                            response = random.choice(correct_score_format) + author_mention_name + '!'
+                            response = f"You have predicted {home_team} {score} {away_team}\n"\
+                                       + random.choice(correct_score_format) + author_mention_name + '!'
                         else:
                             predictions_updated = True
-                            response = '_Prediction updated_\n' + random.choice(correct_score_format) \
-                                       + author_mention_name + '!'
+                            response = '_Prediction updated_\n'\
+                                       f"You have predicted {home_team} {score} {away_team}\n"\
+                                       + random.choice(correct_score_format) + author_mention_name + '!'
                         # update that user's current prediction
                         each.currentPrediction = score
                         score_added = True
@@ -792,7 +812,9 @@ async def user_prediction(ctx, score):
                     # json.dumps(currentUsersClassList, indent=2)
                     # json.dump(currentUsersClassList, f, indent=2)
 
-                    response = random.choice(correct_score_format) + author_mention_name + '!'
+                    response = f"You have predicted {home_team} {score} {away_team}\n"\
+                               + random.choice(correct_score_format) + author_mention_name + '!'
+
                     print(f'A user has made a prediction - {author_text_name} {score}')
 
                 # else:
@@ -820,7 +842,7 @@ async def correct_scores(ctx):
                 response = f'You have correctly predicted {each.numCorrectPredictions} result(s).'
             break
     await ctx.send(response)
-    print(f'A user requested their correct_scores')
+    print(f'A user ({ctx.message.author}) requested their correct_scores')
 
 
 @bot.command(name='score-streak', help='Check your current number of correct guesses in a row!')
@@ -839,7 +861,7 @@ async def score_streak(ctx):
                 response = f'Your current streak is {each.predictionStreak} correct predictions in a row!'
             break
     await ctx.send(response)
-    print(f'A user requested their score_streak')
+    print(f'A user ({ctx.message.author}) requested their score_streak')
 
 
 @bot.command(name='predictions', help='Show all upcoming or current match predictions!')
@@ -935,6 +957,12 @@ async def command_leaderboard(ctx):
     print(f'A user ({ctx.message.author}) requested the predictions leaderboard')
 
 
+@bot.command(name='next-fixture', help='Show the next fixture information')
+async def command_next_fixture(ctx):
+    await next_fixture()
+    print(f'A user ({ctx.message.author}) requested the next fixture information')
+
+
 # ----------------------------------------------------------------------------------------------------------------------
 
 
@@ -944,7 +972,7 @@ async def command_leaderboard(ctx):
 @commands.has_permissions(administrator=True)
 async def admintest(ctx):
     await ctx.send('You have admin rights')
-    print(f'admintest run in {ctx.guild.name} - {ctx.guild.id}')
+    print(f'admintest run in {ctx.guild.name} ({ctx.guild.id}) by {ctx.message.author}')
 
 
 # At the moment, this function will clear the User Objects, so all current predictions and any scoreboard rating
@@ -958,7 +986,7 @@ async def clear_users(ctx):
     await save_to_file()
     await ctx.send('Files have been cleared')
 
-    print(f'Clear_Users run in {ctx.guild.name} - {ctx.guild.id}')
+    print(f'Clear_Users run in {ctx.guild.name} ({ctx.guild.id}) by {ctx.message.author}')
 
 
 @bot.command(name='force-backup', help='Admin Only - Force a file backup of the users')
@@ -967,7 +995,7 @@ async def force_backup(ctx):
     await save_to_file()
     await ctx.send('Users backed up to file')
 
-    print(f'Force backup run in {ctx.guild.name} - {ctx.guild.id}')
+    print(f'Force backup run in {ctx.guild.name} ({ctx.guild.id}) by {ctx.message.author}')
 
 
 # Writing and reading Users to Github as storage
@@ -1050,6 +1078,41 @@ async def read_from_file():
     except json.decoder.JSONDecodeError:
         currentUsersClassList.clear()
         print(f'Users save to file FAILED - or empty file')
+
+
+async def save_error_to_file(error_string):
+    data = error_string
+
+    json_string = json.dumps(data)
+    github = Github(GITHUBTOKEN)
+    repository = github.get_user().get_repo('hc-bot-memory')
+    filename = 'all_fixtures.json'
+    contents = repository.get_contents("")
+    all_files = []
+
+    # check all values in contents
+    while contents:
+        # take first value as file_content
+        file_content = contents.pop(0)
+        # if file_content is a directory (shouldn't ever be)
+        if file_content.type == "dir":
+            contents.extend(repository.get_contents(file_content.path))
+        # else must be a file
+        else:
+            file = file_content
+            # remove extra text to create clean file name for comparison
+            all_files.append(str(file).replace('ContentFile(path="', '').replace('")', ''))
+
+    # check if filename matches in all_files list - if yes then update, if no then create
+    try:
+        if filename in all_files:
+            contents = repository.get_contents(filename)
+            repository.update_file(filename, "Updated all_fixtures error file", json_string, contents.sha)
+        else:
+            repository.create_file(filename, "Created all_fixtures error file", json_string)
+        print(f'all_fixtures error save to file successful')
+    except:
+        print(f'all_fixtures error save to file FAILED')
 
 
 # ----------------------------------------------------------------------------------------------------------------------
