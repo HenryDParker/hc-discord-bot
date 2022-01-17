@@ -636,7 +636,8 @@ async def on_ready():
     global bot_ready
     global currentUsersClassList
     print(f'{bot.user.name} has connected to Discord!')
-    results = f'{bot.user.name} has connected to Discord!'
+    # Commented out the message in discord to avoid spam as Heroku restarts applications once a day
+    # results = f'{bot.user.name} has connected to Discord!'
     #await read_channel_backup()
     bot_ready = True
     try:
@@ -646,7 +647,8 @@ async def on_ready():
         print(f'currentUsersClass has been set to empty as file read failed')
     #for each in discord_channels:
     this_channel = bot.get_channel(channel_id)
-    await this_channel.send(results)
+    # Commented out the message in discord to avoid spam as Heroku restarts applications once a day
+    # await this_channel.send(results)
     await set_status()
     await next_fixture()
 
