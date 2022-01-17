@@ -671,6 +671,7 @@ async def help(ctx):
                        colour=discord.Colour.from_rgb(129, 19, 49))
     em.add_field(name="Commands",
                  value=f"**{command_prefix}p** or **{command_prefix}predict** - Add or update your score prediction\n"
+                       f"**{command_prefix}next-fixture** - Show the next fixture information"
                        f"**{command_prefix}predictions** - Show the predictions for the upcoming fixture\n"
                        f"**{command_prefix}leaderboard** - Show the current leaderboard of predictors\n"
                        f"**{command_prefix}correct-scores** - Your total number of correct scores\n"
@@ -729,6 +730,15 @@ async def score_streak(ctx):
                        colour=discord.Colour.from_rgb(129, 19, 49))
     em.set_thumbnail(url=predictor_bot_logo)
     await ctx.send(embed=em)
+
+
+@help.command(name="next-fixture")
+async def next_fixture(ctx):
+    em = discord.Embed(title="next-fixture", description="Show the next fixture information",
+                       colour=discord.Colour.from_rgb(129, 19, 49))
+    em.set_thumbnail(url=predictor_bot_logo)
+    await ctx.send(embed=em)
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -943,6 +953,7 @@ async def command_leaderboard(ctx):
 @bot.command(name='next-fixture', help='Show the next fixture information')
 async def command_next_fixture(ctx):
     await next_fixture()
+    print(f'A user ({ctx.message.author}) requested the next fixture information')
 
 
 # ----------------------------------------------------------------------------------------------------------------------
