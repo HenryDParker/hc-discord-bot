@@ -1269,7 +1269,7 @@ async def leaderboard():
 
     embed = discord.Embed(title="Top Predictors Leaderboard", colour=discord.Colour.from_rgb(129, 19, 49))
     embed.add_field(name=title, value=leaderboard_string)
-    embed.set_thumbnail(url=west_ham_logo)
+    embed.set_thumbnail(url=predictor_bot_logo)
     this_channel = bot.get_channel(channel_id)
     await this_channel.send(embed=embed)
 
