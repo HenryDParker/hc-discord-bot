@@ -76,6 +76,7 @@ predictions_updated = False
 current_fixture_id = None
 reminder24hr_sent = False
 reminder1hr_sent = False
+is_fixture_today = False
 
 west_ham_logo = "https://media.api-sports.io/football/teams/48.png"
 predictor_bot_logo = "https://i.imgur.com/9runQEU.png"
@@ -181,7 +182,8 @@ async def check_fixtures():
     # Only perform this check after 8am and stop at midnight - can be removed if necessary
     # This will save API calls as few changes to West Ham fixture will occur between these times
     timenow = datetime.now()
-    if timenow.hour >= 9:
+    #global match_today
+    if timenow.hour <= 2 or timenow.hour >= 7:
         # find today's date
         today = date.today()
         # set the month to an int e.g. 02
@@ -216,6 +218,8 @@ async def check_fixtures():
             print(f'API Fixture check complete')
         except:
             print(f'API Fixture check FAILED')
+    # else:
+    #     match_today = False
 
         # # API call to get team info for 2021 Season
         # url_leagues = "https://api-football-v1.p.rapidapi.com/v3/leagues"
@@ -261,6 +265,13 @@ async def check_next_fixture():
 
         # for each item in response dictionary list, find timestamp
         current_time = int(time.time())
+        current_date = datetime.utcnow().date()
+
+
+        #next_kickoff_iso_utc = nextFixture['fixture']['date']
+        #next_kickoff_utc = datetime.strptime(next_kickoff_iso_utc, '%Y-%m-%dT%H:%M:%S%z')
+
+
 
         # set shortest_time_diff to arbitrarily high value
         shortest_time_diff = current_time
@@ -271,29 +282,52 @@ async def check_next_fixture():
             if current_fixture_id is not None:
                 for each in all_fixtures['response']:
                     if each['fixture']['id'] == current_fixture_id:
-                        if each['fixture']['status']['short'] == 'FT' \
-                                or each['fixture']['status']['short'] == 'AET' \
-                                or each['fixture']['status']['short'] == 'PEN' \
-                                or each['fixture']['status']['short'] == 'PST' \
-                                or each['fixture']['status']['short'] == 'CANC' \
-                                or each['fixture']['status']['short'] == 'ABD' \
-                                or each['fixture']['status']['short'] == 'AWD' \
-                                or each['fixture']['status']['short'] == 'WO':
+                        fixture_status = (each['fixture']['status']['short'])
+
+                        # check if the current fixture id has a Full Time status
+                        if fixture_status == 'FT' or fixture_status == 'AET' or fixture_status == 'PEN':
                             print(f'Current fixture has a Full Time status')
                             await give_results()
                             current_fixture_id = None
                             currentFixture = {}
                             break
+
+                        elif fixture_status == 'AWD' or fixture_status == 'WO':
+                            # Match awarded technical loss or walkover - result is null and score streaks are maintained
+                            print(f'Current fixture - {fixture_status}')
+
+                            await null_result(fixture_status)
+                            current_fixture_id = None
+                            currentFixture = {}
+                            break
+
+                        elif fixture_status == 'ABD' or fixture_status == 'PST':
+                            # Match abandoned - result is null and  score streaks are maintained
+                            print(f'Current fixture - {fixture_status}')
+
+                            await null_result(fixture_status)
+                            current_fixture_id = None
+                            currentFixture = {}
+                            break
+
+
         except KeyError:
             await save_error_to_file(all_fixtures)
             print(f'Cannot find fixture info - current_fixture_id - all_fixtures dict')
 
         try:
+            global is_fixture_today
             for each in all_fixtures['response']:
                 # get fixture timestamp
                 fixture_time = (each['fixture']['timestamp'])
                 # get fixture status
                 fixture_status = (each['fixture']['status']['short'])
+                fixture_date = (each['fixture']['date'])
+                fixture_date = datetime.strptime(fixture_date, '%Y-%m-%dT%H:%M:%S%z')
+                fixture_date = fixture_date.date()
+
+                is_fixture_today = await fixture_today(current_date, fixture_date)
+
 
                 time_difference = fixture_time - current_time
 
@@ -319,7 +353,8 @@ async def check_next_fixture():
                         or fixture_status == 'P' \
                         or fixture_status == 'BT' \
                         or fixture_status == 'LIVE' \
-                        or fixture_status == 'INT':
+                        or fixture_status == 'INT'\
+                        or fixture_status == 'SUSP':
                     matchInProgress = True
                     # get fixture id
                     current_fixture_id = (each['fixture']['id'])
@@ -343,14 +378,21 @@ async def check_next_fixture():
                         # no, continue to next fixture
                         continue
 
-                # TBD, SUSP, INT
-                else:
-                    # check if previous iteration had a match in progress
-                    if matchInProgress:
-                        await give_results()
-                        matchInProgress = False
-                        print(f'Match in progress is TBD, SUSP or INT')
-                    continue
+                # # TBD, SUSP, INT
+                # else:
+                #     # check if previous iteration had a match in progress
+                #     if matchInProgress:
+                #         await give_results()
+                #         matchInProgress = False
+                #         print(f'Match in progress is TBD, SUSP or INT')
+                #     continue
+
+            next_fixture_status = nextFixture['fixture']['status']['short']
+
+            if next_fixture_status == "CANC" or next_fixture_status == "PST":
+                await postponed_fixture(next_fixture_status)
+
+
         except KeyError:
             await save_error_to_file(all_fixtures)
             print(f'Cannot find fixture info - all_fixtures dict')
@@ -553,6 +595,63 @@ async def give_results():
 
 
 @bot.event
+async def null_result(null_fixture_status):
+    global matchInProgress
+    # match no longer in progress
+    matchInProgress = False
+
+    # clear current predictions as predictions are nullified
+    for each in currentUsersClassList:
+        each.currentPrediction = None
+    # write class to file
+    await save_to_file()
+
+    if null_fixture_status == 'ABD':
+        response = f'The match was abandoned'
+    elif null_fixture_status == 'AWD':
+        response = f'The match was a technical loss'
+    elif null_fixture_status == 'WO':
+        response = f'The match was a walkover'
+    else:
+        response = f'The match finished for unknown reasons'
+
+    em = discord.Embed(title="**Match Result**",
+                       description=f'{response}',
+                       colour=discord.Colour.from_rgb(129, 19, 49))
+
+    title = f'To maintain fairness'
+    subtitle = f'Predictions have been nullified and score streaks are maintained'
+    em.add_field(name=title, value=subtitle)
+
+    await next_fixture()
+
+@bot.event
+async def postponed_fixture(postponed_fixture_status):
+
+    for each in currentUsersClassList:
+        each.currentPrediction = None
+    # write class to file
+    await save_to_file()
+
+    if postponed_fixture_status == 'PST':
+        response = f'The upcoming match has been postponed'
+    elif postponed_fixture_status == 'CANC':
+        response = f'The upcoming match has been cancelled'
+    else:
+        response = f'The upcoming match will not go ahead for unknown reasons'
+
+    em = discord.Embed(title="**Match Info**",
+                       description=f'{response}',
+                       colour=discord.Colour.from_rgb(129, 19, 49))
+
+    title = f'To maintain fairness'
+    subtitle = f'Predictions have been nullified and score streaks are maintained'
+    em.add_field(name=title, value=subtitle)
+
+    await next_fixture()
+
+
+@bot.event
 async def next_fixture():
     if bot_ready:
         this_channel = bot.get_channel(channel_id)
@@ -630,6 +729,23 @@ async def next_fixture():
             em.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
             await this_channel.send(embed=em)
         print(f'Next fixture information sent')
+
+
+@bot.event
+async def fixture_today(current_date, fixture_date):
+    if current_date == fixture_date:
+        return True
+    else:
+        return False
+
+
+# @bot.event
+# async def write_match_in_progress():
+#     if matchInProgress:
+#         if not match_written_to_file:
+#             # save to file
+#             match_written_to_file = True
+
 
 
 # When the bot joins a server
