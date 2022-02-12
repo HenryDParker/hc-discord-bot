@@ -76,6 +76,7 @@ predictions_updated = False
 current_fixture_id = None
 reminder24hr_sent = False
 reminder1hr_sent = False
+is_fixture_today = False
 
 west_ham_logo = "https://media.api-sports.io/football/teams/48.png"
 predictor_bot_logo = "https://i.imgur.com/9runQEU.png"
@@ -181,7 +182,8 @@ async def check_fixtures():
     # Only perform this check after 8am and stop at midnight - can be removed if necessary
     # This will save API calls as few changes to West Ham fixture will occur between these times
     timenow = datetime.now()
-    if timenow.hour >= 9:
+    #global match_today
+    if timenow.hour <= 2 or timenow.hour >= 7:
         # find today's date
         today = date.today()
         # set the month to an int e.g. 02
@@ -216,6 +218,8 @@ async def check_fixtures():
             print(f'API Fixture check complete')
         except:
             print(f'API Fixture check FAILED')
+    # else:
+    #     match_today = False
 
         # # API call to get team info for 2021 Season
         # url_leagues = "https://api-football-v1.p.rapidapi.com/v3/leagues"
@@ -261,6 +265,13 @@ async def check_next_fixture():
 
         # for each item in response dictionary list, find timestamp
         current_time = int(time.time())
+        current_date = datetime.utcnow().date()
+
+
+        #next_kickoff_iso_utc = nextFixture['fixture']['date']
+        #next_kickoff_utc = datetime.strptime(next_kickoff_iso_utc, '%Y-%m-%dT%H:%M:%S%z')
+
+
 
         # set shortest_time_diff to arbitrarily high value
         shortest_time_diff = current_time
@@ -305,11 +316,18 @@ async def check_next_fixture():
             print(f'Cannot find fixture info - current_fixture_id - all_fixtures dict')
 
         try:
+            global is_fixture_today
             for each in all_fixtures['response']:
                 # get fixture timestamp
                 fixture_time = (each['fixture']['timestamp'])
                 # get fixture status
                 fixture_status = (each['fixture']['status']['short'])
+                fixture_date = (each['fixture']['date'])
+                fixture_date = datetime.strptime(fixture_date, '%Y-%m-%dT%H:%M:%S%z')
+                fixture_date = fixture_date.date()
+
+                is_fixture_today = await fixture_today(current_date, fixture_date)
+
 
                 time_difference = fixture_time - current_time
 
@@ -711,6 +729,23 @@ async def next_fixture():
             em.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
             await this_channel.send(embed=em)
         print(f'Next fixture information sent')
+
+
+@bot.event
+async def fixture_today(current_date, fixture_date):
+    if current_date == fixture_date:
+        return True
+    else:
+        return False
+
+
+# @bot.event
+# async def write_match_in_progress():
+#     if matchInProgress:
+#         if not match_written_to_file:
+#             # save to file
+#             match_written_to_file = True
+
 
 
 # When the bot joins a server
