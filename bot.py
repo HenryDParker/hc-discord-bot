@@ -90,10 +90,10 @@ uk_tz = tz.gettz('Europe/London')
 
 # Static Channel ID so
 # Test Server Channel ID
-channel_id = 917754145367289929
+# channel_id = 917754145367289929
 
 # Hammers Chat Channel ID
-# channel_id = 818488786190991360
+channel_id = 929200954023215194
 
 
 # regex definitions
