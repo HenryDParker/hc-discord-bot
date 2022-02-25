@@ -22,7 +22,7 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 # GUILD = os.getenv('DISCORD_GUILD')
 RAPIDAPIKEY = os.getenv('RAPIDAPI_KEY')
 GITHUBTOKEN = os.getenv('GITHUB_TOKEN')
-#channel_id = os.getenv('CHANNEL_ID')
+channel_id = int(os.getenv('CHANNEL_ID'))
 
 # client = discord.Client()
 # define bot command decorator
@@ -94,7 +94,7 @@ uk_tz = tz.gettz('Europe/London')
 # channel_id = 917754145367289929
 
 # Hammers Chat Channel ID
-channel_id = 929200954023215194
+# channel_id = 929200954023215194
 
 
 # regex definitions
