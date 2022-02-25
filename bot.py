@@ -14,7 +14,10 @@ from dotenv import load_dotenv
 from datetime import datetime, date
 from dateutil import tz
 
-# URL to invite bot
+# URL to invite TEST bot
+# https://discord.com/api/oauth2/authorize?client_id=946767991670997052&permissions=274878114880&scope=bot
+
+# URL to invite LIVE bot
 # https://discord.com/api/oauth2/authorize?client_id=917479797242875936&permissions=274878114880&scope=bot
 
 load_dotenv()
@@ -787,12 +790,18 @@ async def help(ctx):
     em = discord.Embed(title="Help", description=f"Use {command_prefix}help *command* for extended information",
                        colour=discord.Colour.from_rgb(129, 19, 49))
     em.add_field(name="Commands",
-                 value=f"**{command_prefix}p** or **{command_prefix}predict** - Add or update your score prediction\n"
-                       f"**{command_prefix}next-fixture** - Show the next fixture information\n"
-                       f"**{command_prefix}predictions** - Show the predictions for the upcoming fixture\n"
-                       f"**{command_prefix}leaderboard** - Show the current leaderboard of predictors\n"
-                       f"**{command_prefix}correct-scores** - Your total number of correct scores\n"
-                       f"**{command_prefix}score-streak** - Your current number of correct scores in a row\n")
+                 value=f"**{command_prefix}predict** (**{command_prefix}p**)"
+                       f" - Add or update your score prediction\n"
+                       f"**{command_prefix}next-fixture** (**{command_prefix}nf**)"
+                       f" - Show the next fixture information\n"
+                       f"**{command_prefix}predictions** (**{command_prefix}cp**)"
+                       f" - Show the predictions for the upcoming fixture\n"
+                       f"**{command_prefix}leaderboard** (**{command_prefix}lb**)"
+                       f" - Show the current leaderboard of predictors\n"
+                       f"**{command_prefix}correct-scores** (**{command_prefix}cs**)"
+                       f" - Your total number of correct scores\n"
+                       f"**{command_prefix}score-streak** (**{command_prefix}ss**)"
+                       f" - Your current number of correct scores in a row\n")
     em.set_thumbnail(url=predictor_bot_logo)
     await ctx.send(embed=em)
 
@@ -820,6 +829,16 @@ async def help_predict(ctx):
 async def help_predictions(ctx):
     em = discord.Embed(title="predictions", description="Show all the submitted predictions for the upcoming fixture",
                        colour=discord.Colour.from_rgb(129, 19, 49))
+    em.add_field(name="*Aliases*", value=f"{command_prefix}current-predictions or {command_prefix}cp")
+    em.set_thumbnail(url=predictor_bot_logo)
+    await ctx.send(embed=em)
+
+
+@help.command(name="current-predictions")
+async def help_predictions(ctx):
+    em = discord.Embed(title="predictions", description="Show all the submitted predictions for the upcoming fixture",
+                       colour=discord.Colour.from_rgb(129, 19, 49))
+    em.add_field(name="*Aliases*", value=f"{command_prefix}predictions or {command_prefix}cp")
     em.set_thumbnail(url=predictor_bot_logo)
     await ctx.send(embed=em)
 
@@ -828,6 +847,7 @@ async def help_predictions(ctx):
 async def help_leaderboard(ctx):
     em = discord.Embed(title="leaderboard", description="Show the current leaderboard of the top score predictors",
                        colour=discord.Colour.from_rgb(129, 19, 49))
+    em.add_field(name="*Aliases*", value=f"{command_prefix}lb")
     em.set_thumbnail(url=predictor_bot_logo)
     await ctx.send(embed=em)
 
@@ -836,6 +856,7 @@ async def help_leaderboard(ctx):
 async def help_correct_scores(ctx):
     em = discord.Embed(title="correct-scores", description="Show your total number of correct score predictions",
                        colour=discord.Colour.from_rgb(129, 19, 49))
+    em.add_field(name="*Aliases*", value=f"{command_prefix}cs")
     em.set_thumbnail(url=predictor_bot_logo)
     await ctx.send(embed=em)
 
@@ -845,6 +866,7 @@ async def help_score_streak(ctx):
     em = discord.Embed(title="score-streak", description="Show your current number of correct score predictions"
                                                          " in a row",
                        colour=discord.Colour.from_rgb(129, 19, 49))
+    em.add_field(name="*Aliases*", value=f"{command_prefix}ss")
     em.set_thumbnail(url=predictor_bot_logo)
     await ctx.send(embed=em)
 
@@ -853,6 +875,7 @@ async def help_score_streak(ctx):
 async def help_next_fixture(ctx):
     em = discord.Embed(title="next-fixture", description="Show the next fixture information",
                        colour=discord.Colour.from_rgb(129, 19, 49))
+    em.add_field(name="*Aliases*", value=f"{command_prefix}nf")
     em.set_thumbnail(url=predictor_bot_logo)
     await ctx.send(embed=em)
 
@@ -945,7 +968,7 @@ async def user_prediction(ctx, score):
     await ctx.send(response)
 
 
-@bot.command(name='correct-scores', help='Check your total number of correct guesses!')
+@bot.command(name='correct-scores', help='Check your total number of correct guesses!', aliases=["cs"])
 async def correct_scores(ctx):
     author_mention_name = format(ctx.message.author.mention)
     response = "It looks like you haven't made any predictions yet!"
@@ -962,7 +985,7 @@ async def correct_scores(ctx):
     print(f'A user ({ctx.message.author}) requested their correct_scores')
 
 
-@bot.command(name='score-streak', help='Check your current number of correct guesses in a row!')
+@bot.command(name='score-streak', help='Check your current number of correct guesses in a row!', aliases=["ss"])
 async def score_streak(ctx):
     author_mention_name = format(ctx.message.author.mention)
     response = "It looks like you haven't made any predictions yet!"
@@ -981,7 +1004,8 @@ async def score_streak(ctx):
     print(f'A user ({ctx.message.author}) requested their score_streak')
 
 
-@bot.command(name='predictions', help='Show all upcoming or current match predictions!')
+@bot.command(name='predictions', help='Show all upcoming or current match predictions!',
+             aliases=["cp", "current-predictions"])
 async def current_predictions(ctx):
     # Create temporary currentPredictions list from Objects rather than globally
     current_predictions_list = []
@@ -1068,13 +1092,13 @@ async def current_predictions(ctx):
     print(f'A user ({ctx.message.author}) requested upcoming match predictions')
 
 
-@bot.command(name='leaderboard', help='Shows top score predictors!')
+@bot.command(name='leaderboard', help='Shows top score predictors!', aliases=["lb"])
 async def command_leaderboard(ctx):
     await leaderboard()
     print(f'A user ({ctx.message.author}) requested the predictions leaderboard')
 
 
-@bot.command(name='next-fixture', help='Show the next fixture information')
+@bot.command(name='next-fixture', help='Show the next fixture information', aliases=["nf"])
 async def command_next_fixture(ctx):
     await next_fixture()
     print(f'A user ({ctx.message.author}) requested the next fixture information')
