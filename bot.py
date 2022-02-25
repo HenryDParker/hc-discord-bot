@@ -790,12 +790,18 @@ async def help(ctx):
     em = discord.Embed(title="Help", description=f"Use {command_prefix}help *command* for extended information",
                        colour=discord.Colour.from_rgb(129, 19, 49))
     em.add_field(name="Commands",
-                 value=f"**{command_prefix}p** or **{command_prefix}predict** - Add or update your score prediction\n"
-                       f"**{command_prefix}next-fixture** - Show the next fixture information\n"
-                       f"**{command_prefix}predictions** - Show the predictions for the upcoming fixture\n"
-                       f"**{command_prefix}leaderboard** - Show the current leaderboard of predictors\n"
-                       f"**{command_prefix}correct-scores** - Your total number of correct scores\n"
-                       f"**{command_prefix}score-streak** - Your current number of correct scores in a row\n")
+                 value=f"**{command_prefix}predict** (**{command_prefix}p**)"
+                       f" - Add or update your score prediction\n"
+                       f"**{command_prefix}next-fixture** (**{command_prefix}nf**)"
+                       f" - Show the next fixture information\n"
+                       f"**{command_prefix}predictions** (**{command_prefix}cp**)"
+                       f" - Show the predictions for the upcoming fixture\n"
+                       f"**{command_prefix}leaderboard** (**{command_prefix}lb**)"
+                       f" - Show the current leaderboard of predictors\n"
+                       f"**{command_prefix}correct-scores** (**{command_prefix}cs**)"
+                       f" - Your total number of correct scores\n"
+                       f"**{command_prefix}score-streak** (**{command_prefix}ss**)"
+                       f" - Your current number of correct scores in a row\n")
     em.set_thumbnail(url=predictor_bot_logo)
     await ctx.send(embed=em)
 
@@ -823,6 +829,16 @@ async def help_predict(ctx):
 async def help_predictions(ctx):
     em = discord.Embed(title="predictions", description="Show all the submitted predictions for the upcoming fixture",
                        colour=discord.Colour.from_rgb(129, 19, 49))
+    em.add_field(name="*Aliases*", value=f"{command_prefix}current-predictions or {command_prefix}cp")
+    em.set_thumbnail(url=predictor_bot_logo)
+    await ctx.send(embed=em)
+
+
+@help.command(name="current-predictions")
+async def help_predictions(ctx):
+    em = discord.Embed(title="predictions", description="Show all the submitted predictions for the upcoming fixture",
+                       colour=discord.Colour.from_rgb(129, 19, 49))
+    em.add_field(name="*Aliases*", value=f"{command_prefix}predictions or {command_prefix}cp")
     em.set_thumbnail(url=predictor_bot_logo)
     await ctx.send(embed=em)
 
@@ -831,6 +847,7 @@ async def help_predictions(ctx):
 async def help_leaderboard(ctx):
     em = discord.Embed(title="leaderboard", description="Show the current leaderboard of the top score predictors",
                        colour=discord.Colour.from_rgb(129, 19, 49))
+    em.add_field(name="*Aliases*", value=f"{command_prefix}lb")
     em.set_thumbnail(url=predictor_bot_logo)
     await ctx.send(embed=em)
 
@@ -839,6 +856,7 @@ async def help_leaderboard(ctx):
 async def help_correct_scores(ctx):
     em = discord.Embed(title="correct-scores", description="Show your total number of correct score predictions",
                        colour=discord.Colour.from_rgb(129, 19, 49))
+    em.add_field(name="*Aliases*", value=f"{command_prefix}cs")
     em.set_thumbnail(url=predictor_bot_logo)
     await ctx.send(embed=em)
 
@@ -848,6 +866,7 @@ async def help_score_streak(ctx):
     em = discord.Embed(title="score-streak", description="Show your current number of correct score predictions"
                                                          " in a row",
                        colour=discord.Colour.from_rgb(129, 19, 49))
+    em.add_field(name="*Aliases*", value=f"{command_prefix}ss")
     em.set_thumbnail(url=predictor_bot_logo)
     await ctx.send(embed=em)
 
@@ -856,6 +875,7 @@ async def help_score_streak(ctx):
 async def help_next_fixture(ctx):
     em = discord.Embed(title="next-fixture", description="Show the next fixture information",
                        colour=discord.Colour.from_rgb(129, 19, 49))
+    em.add_field(name="*Aliases*", value=f"{command_prefix}nf")
     em.set_thumbnail(url=predictor_bot_logo)
     await ctx.send(embed=em)
 
