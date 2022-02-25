@@ -794,7 +794,7 @@ async def help(ctx):
                        f" - Add or update your score prediction\n"
                        f"**{command_prefix}next-fixture** (**{command_prefix}nf**)"
                        f" - Show the next fixture information\n"
-                       f"**{command_prefix}predictions** (**{command_prefix}cp**)"
+                       f"**{command_prefix}predictions** (**{command_prefix}cpr**)"
                        f" - Show the predictions for the upcoming fixture\n"
                        f"**{command_prefix}leaderboard** (**{command_prefix}lb**)"
                        f" - Show the current leaderboard of predictors\n"
@@ -838,7 +838,7 @@ async def help_predictions(ctx):
 async def help_predictions(ctx):
     em = discord.Embed(title="predictions", description="Show all the submitted predictions for the upcoming fixture",
                        colour=discord.Colour.from_rgb(129, 19, 49))
-    em.add_field(name="*Aliases*", value=f"{command_prefix}predictions or {command_prefix}cp")
+    em.add_field(name="*Aliases*", value=f"{command_prefix}predictions or {command_prefix}cpr")
     em.set_thumbnail(url=predictor_bot_logo)
     await ctx.send(embed=em)
 
@@ -1005,7 +1005,7 @@ async def score_streak(ctx):
 
 
 @bot.command(name='predictions', help='Show all upcoming or current match predictions!',
-             aliases=["cp", "current-predictions"])
+             aliases=["cpr", "current-predictions"])
 async def current_predictions(ctx):
     # Create temporary currentPredictions list from Objects rather than globally
     current_predictions_list = []
