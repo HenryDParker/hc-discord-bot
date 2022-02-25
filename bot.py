@@ -14,7 +14,10 @@ from dotenv import load_dotenv
 from datetime import datetime, date
 from dateutil import tz
 
-# URL to invite bot
+# URL to invite TEST bot
+# https://discord.com/api/oauth2/authorize?client_id=946767991670997052&permissions=274878114880&scope=bot
+
+# URL to invite LIVE bot
 # https://discord.com/api/oauth2/authorize?client_id=917479797242875936&permissions=274878114880&scope=bot
 
 load_dotenv()
@@ -945,7 +948,7 @@ async def user_prediction(ctx, score):
     await ctx.send(response)
 
 
-@bot.command(name='correct-scores', help='Check your total number of correct guesses!')
+@bot.command(name='correct-scores', help='Check your total number of correct guesses!', aliases=["cs"])
 async def correct_scores(ctx):
     author_mention_name = format(ctx.message.author.mention)
     response = "It looks like you haven't made any predictions yet!"
@@ -962,7 +965,7 @@ async def correct_scores(ctx):
     print(f'A user ({ctx.message.author}) requested their correct_scores')
 
 
-@bot.command(name='score-streak', help='Check your current number of correct guesses in a row!')
+@bot.command(name='score-streak', help='Check your current number of correct guesses in a row!', aliases=["ss"])
 async def score_streak(ctx):
     author_mention_name = format(ctx.message.author.mention)
     response = "It looks like you haven't made any predictions yet!"
@@ -981,7 +984,8 @@ async def score_streak(ctx):
     print(f'A user ({ctx.message.author}) requested their score_streak')
 
 
-@bot.command(name='predictions', help='Show all upcoming or current match predictions!')
+@bot.command(name='predictions', help='Show all upcoming or current match predictions!',
+             aliases=["cp", "current-predictions"])
 async def current_predictions(ctx):
     # Create temporary currentPredictions list from Objects rather than globally
     current_predictions_list = []
@@ -1068,13 +1072,13 @@ async def current_predictions(ctx):
     print(f'A user ({ctx.message.author}) requested upcoming match predictions')
 
 
-@bot.command(name='leaderboard', help='Shows top score predictors!')
+@bot.command(name='leaderboard', help='Shows top score predictors!', aliases=["lb"])
 async def command_leaderboard(ctx):
     await leaderboard()
     print(f'A user ({ctx.message.author}) requested the predictions leaderboard')
 
 
-@bot.command(name='next-fixture', help='Show the next fixture information')
+@bot.command(name='next-fixture', help='Show the next fixture information', aliases=["nf"])
 async def command_next_fixture(ctx):
     await next_fixture()
     print(f'A user ({ctx.message.author}) requested the next fixture information')
