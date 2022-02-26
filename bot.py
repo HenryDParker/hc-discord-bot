@@ -105,74 +105,74 @@ scorePattern = re.compile('^[0-9]{1,2}-[0-9]{1,2}$')
 scorePatternHigh = re.compile('^[0-9]{1,5}-[0-9]{1,5}$')
 
 
-# Channel assignment, storage and backup
+# Reminder status storage and backup
 # ----------------------------------------------------------------------------------------------------------------------
-# @bot.command(name='channel', help='Admin Only - Assign the channel that this bot will operate in')
-# @commands.has_permissions(administrator=True)
-# async def which_channel(ctx):
-#     guild_id = ctx.guild.id
-#     guild_name = ctx.guild.name
-#     channel_id = ctx.channel.id
-#     discord_channels[guild_id] = channel_id
-#     print(f'A channel has been set on {guild_name} with Guild id: {guild_id}')
-#     await write_channel_backup()
+async def write_reminder_status():
+    # perform local write (NO READ) for testing purposes
+    global reminder24hr_sent
+    global reminder1hr_sent
+    reminders_status_dict = {
+        "reminder24hr": reminder24hr_sent,
+        "reminder1hr": reminder1hr_sent
+    }
 
 
-# async def write_channel_backup():
-#     # perform local write (NO READ) for testing purposes
-#     with open('channel_backup.json', 'w') as outfile:
-#         json.dump(discord_channels, outfile, indent=2)
-#
-#     # convert "data" to a json_string and send this to 'hc-bot-memory' repo on GitHub for backup
-#     json_string = json.dumps(discord_channels)
-#     github = Github(GITHUBTOKEN)
-#     repository = github.get_user().get_repo('hc-bot-memory')
-#     filename = 'channel_backup.json'
-#     contents = repository.get_contents("")
-#     all_files = []
-#
-#     # check all values in contents
-#     while contents:
-#         # take first value as file_content
-#         file_content = contents.pop(0)
-#         # if file_content is a directory (shouldn't ever be)
-#         if file_content.type == "dir":
-#             contents.extend(repository.get_contents(file_content.path))
-#         # else must be a file
-#         else:
-#             file = file_content
-#             # remove extra text to create clean file name for comparison
-#             all_files.append(str(file).replace('ContentFile(path="', '').replace('")', ''))
-#
-#     # check if filename matches in all_files list - if yes then update, if no then create
-#     if filename in all_files:
-#         contents = repository.get_contents(filename)
-#         repository.update_file(filename, "Updated channel_backup file", json_string, contents.sha)
-#     else:
-#         repository.create_file(filename, "Created channel_backup file", json_string)
-#     print(f'Channel backup write complete')
-#
-#
-# async def read_channel_backup():
-#     try:
-#         # download file from Github repo 'hc-bot-memory' and decode to json_string
-#         github = Github(GITHUBTOKEN)
-#         repository = github.get_user().get_repo('hc-bot-memory')
-#         filename = 'channel_backup.json'
-#         file = repository.get_contents(filename)
-#         json_string = file.decoded_content.decode()
-#
-#         global discord_channels
-#         # convert json_string to "discord_channels"
-#         discord_channels = json.loads(json_string)
-#         print(f'Channel backup read complete')
-#
-#     # If the read fails in any way, send hardcoded warning message to Test Server and TAG ME
-#     except:
-#         test_server_id = bot.get_channel(917754145367289929)
-#         response = "This bot has failed to read the channel backup from Github <@110010452045467648> "
-#         await test_server_id.send(response)
-#         print(f'Channel backup read FAILED')
+    with open('reminder_status.json', 'w') as outfile:
+        json.dump(reminders_status_dict, outfile, indent=2)
+
+    # convert "data" to a json_string and send this to 'hc-bot-memory' repo on GitHub for backup
+    json_string = json.dumps(reminders_status_dict)
+    github = Github(GITHUBTOKEN)
+    repository = github.get_user().get_repo('hc-bot-memory')
+    filename = 'reminder_status.json'
+    contents = repository.get_contents("")
+    all_files = []
+
+    # check all values in contents
+    while contents:
+        # take first value as file_content
+        file_content = contents.pop(0)
+        # if file_content is a directory (shouldn't ever be)
+        if file_content.type == "dir":
+            contents.extend(repository.get_contents(file_content.path))
+        # else must be a file
+        else:
+            file = file_content
+            # remove extra text to create clean file name for comparison
+            all_files.append(str(file).replace('ContentFile(path="', '').replace('")', ''))
+
+    # check if filename matches in all_files list - if yes then update, if no then create
+    if filename in all_files:
+        contents = repository.get_contents(filename)
+        repository.update_file(filename, "Updated reminder_status file", json_string, contents.sha)
+    else:
+        repository.create_file(filename, "Created reminder_status file", json_string)
+    print(f'Reminder status write complete')
+
+
+async def read_reminder_status():
+    global reminder24hr_sent
+    global reminder1hr_sent
+    try:
+        # download file from Github repo 'hc-bot-memory' and decode to json_string
+        github = Github(GITHUBTOKEN)
+        repository = github.get_user().get_repo('hc-bot-memory')
+        filename = 'reminder_status.json'
+        file = repository.get_contents(filename)
+        json_string = file.decoded_content.decode()
+
+        # convert json_file to "reminders_status"
+        reminders_status_dict = json.loads(json_string)
+        reminder24hr_sent = reminders_status_dict['reminder24hr']
+        reminder1hr_sent = reminders_status_dict['reminder1hr']
+        print(f'Channel backup read complete')
+
+    # If the read fails in any way, set reminders to False as a backup
+    # This is not catastrophic, will only send a Reminder again in case of a bot restart
+    except:
+        reminder24hr_sent = False
+        reminder1hr_sent = False
+        print(f'reminder status read FAILED\nReminder set to FALSE')
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -180,7 +180,7 @@ scorePatternHigh = re.compile('^[0-9]{1,5}-[0-9]{1,5}$')
 
 # Timed tasks
 # ----------------------------------------------------------------------------------------------------------------------
-# Check fixture info every hour
+# Check fixture info every quarter-hour
 @tasks.loop(minutes=15)
 async def check_fixtures():
     # Only perform this check after 8am and stop at midnight - can be removed if necessary
@@ -248,7 +248,7 @@ async def check_fixtures():
         # with open('leagues_dict_json.json', 'w') as f:
         #     json.dump(leagues_dict_json, f)
 
-
+# looping every 10 minutes
 @tasks.loop(minutes=10)
 async def check_save():
     global predictions_updated
@@ -258,10 +258,10 @@ async def check_save():
             predictions_updated = False
 
 
-# looping every minute for testing purposes
+# looping every minute
 @tasks.loop(minutes=1)
 async def check_next_fixture():
-    # This was causing excessive logging - would be useful if logs were stored correctly
+    # This was causing excessive logging - would be useful if logs were stored locally
     #print(f'Check next fixture')
     global matchInProgress
     with open("fixtures_dict_json.json", "r") as read_file:
@@ -469,6 +469,7 @@ async def reminder():
             await this_channel.send(embed=em)
             print(f'Fixture 24hr reminder sent')
             reminder24hr_sent = True
+            await write_reminder_status()
 
 
         elif year_diff == 0 and month_diff == 0 and day_diff == 0\
@@ -488,6 +489,7 @@ async def reminder():
             await this_channel.send(embed=em)
             print(f'Fixture 1hr reminder sent')
             reminder1hr_sent = True
+            await write_reminder_status()
 
 
 
@@ -666,6 +668,8 @@ async def next_fixture():
         reminder24hr_sent = False
         reminder1hr_sent = False
 
+        await write_reminder_status()
+
         # Grab details for next match
         next_home_team = nextFixture['teams']['home']['name']
         next_away_team = nextFixture['teams']['away']['name']
@@ -760,7 +764,7 @@ async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
     # Commented out the message in discord to avoid spam as Heroku restarts applications once a day
     # results = f'{bot.user.name} has connected to Discord!'
-    #await read_channel_backup()
+    await read_reminder_status()
     bot_ready = True
     try:
         await read_from_file()
