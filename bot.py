@@ -183,7 +183,7 @@ async def read_reminder_status():
 # Check fixture info every quarter-hour
 @tasks.loop(minutes=15)
 async def check_fixtures():
-    # Only perform this check after 8am and stop at midnight - can be removed if necessary
+    # Only perform this check after 7am and stop at 2am - can be removed if necessary
     # This will save API calls as few changes to West Ham fixture will occur between these times
     timenow = datetime.now()
     #global match_today
@@ -222,31 +222,7 @@ async def check_fixtures():
             print(f'API Fixture check complete')
         except:
             print(f'API Fixture check FAILED')
-    # else:
-    #     match_today = False
 
-        # # API call to get team info for 2021 Season
-        # url_leagues = "https://api-football-v1.p.rapidapi.com/v3/leagues"
-        #
-        # querystring_leagues = {
-        #     "season": current_season,
-        #     "team": "48"
-        # }
-        #
-        # headers_leagues = {
-        #     'x-rapidapi-host': "api-football-v1.p.rapidapi.com",
-        #     'x-rapidapi-key': RAPIDAPIKEY
-        # }
-        #
-        # api_response = requests.request("GET", url_leagues, headers=headers_leagues, params=querystring_leagues)
-        # data = api_response.text
-        # leagues_dict_json = json.loads(data)
-        #
-        # # with open('leagues_dict_json.json', 'wb') as leagues_dict_json_file:
-        # #     pickle.dump(leagues_dict_json, leagues_dict_json_file)
-        #
-        # with open('leagues_dict_json.json', 'w') as f:
-        #     json.dump(leagues_dict_json, f)
 
 # looping every 10 minutes
 @tasks.loop(minutes=10)
@@ -270,12 +246,6 @@ async def check_next_fixture():
         # for each item in response dictionary list, find timestamp
         current_time = int(time.time())
         current_date = datetime.utcnow().date()
-
-
-        #next_kickoff_iso_utc = nextFixture['fixture']['date']
-        #next_kickoff_utc = datetime.strptime(next_kickoff_iso_utc, '%Y-%m-%dT%H:%M:%S%z')
-
-
 
         # set shortest_time_diff to arbitrarily high value
         shortest_time_diff = current_time
@@ -332,11 +302,8 @@ async def check_next_fixture():
 
                 is_fixture_today = await fixture_today(current_date, fixture_date)
 
-
                 time_difference = fixture_time - current_time
 
-                # check if difference is negative (fixture is before now) - if yes, skip to next for loop iteration
-                # if time_difference <= 0:
                 # check if fixture status is Full Time (or other finished) - if yes, skip to next for loop iteration
                 if fixture_status == 'FT' \
                         or fixture_status == 'AET' \
@@ -558,9 +525,6 @@ async def give_results():
                 else:
                     each.predictionStreak = 0
                     each.previousPredictionCorrect = False
-
-            # Check if list is empty (no correct guesses) and print a response accordingly
-            # --- unsure whether this is the correct pythonic way to check empty list
 
             response = f'The match finished **{fixture_result_full}**'
 
