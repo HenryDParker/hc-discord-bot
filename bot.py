@@ -80,7 +80,6 @@ predictions_updated = False
 current_fixture_id = None
 reminder24hr_sent = False
 reminder1hr_sent = False
-is_fixture_today = False
 
 west_ham_logo = "https://media.api-sports.io/football/teams/48.png"
 predictor_bot_logo = "https://i.imgur.com/9runQEU.png"
@@ -290,7 +289,6 @@ async def check_next_fixture():
             print(f'Cannot find fixture info - current_fixture_id - all_fixtures dict')
 
         try:
-            global is_fixture_today
             for each in all_fixtures['response']:
                 # get fixture timestamp
                 fixture_time = (each['fixture']['timestamp'])
@@ -299,8 +297,6 @@ async def check_next_fixture():
                 fixture_date = (each['fixture']['date'])
                 fixture_date = datetime.strptime(fixture_date, '%Y-%m-%dT%H:%M:%S%z')
                 fixture_date = fixture_date.date()
-
-                is_fixture_today = await fixture_today(current_date, fixture_date)
 
                 time_difference = fixture_time - current_time
 
