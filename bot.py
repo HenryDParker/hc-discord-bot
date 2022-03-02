@@ -80,6 +80,7 @@ predictions_updated = False
 current_fixture_id = None
 reminder24hr_sent = False
 reminder1hr_sent = False
+match_started_status = False
 
 west_ham_logo = "https://media.api-sports.io/football/teams/48.png"
 predictor_bot_logo = "https://i.imgur.com/9runQEU.png"
@@ -106,13 +107,15 @@ scorePatternHigh = re.compile('^[0-9]{1,5}-[0-9]{1,5}$')
 
 # Reminder status storage and backup
 # ----------------------------------------------------------------------------------------------------------------------
-async def write_reminder_status():
+async def write_reminder_and_match_status():
     # perform local write (NO READ) for testing purposes
     global reminder24hr_sent
     global reminder1hr_sent
+    global match_started_status
     reminders_status_dict = {
         "reminder24hr": reminder24hr_sent,
-        "reminder1hr": reminder1hr_sent
+        "reminder1hr": reminder1hr_sent,
+        "match_started": match_started_status
     }
 
 
@@ -149,9 +152,10 @@ async def write_reminder_status():
     print(f'Reminder status write complete')
 
 
-async def read_reminder_status():
+async def read_reminder_and_match_status():
     global reminder24hr_sent
     global reminder1hr_sent
+    global match_started_status
     try:
         # download file from Github repo 'hc-bot-memory' and decode to json_string
         github = Github(GITHUBTOKEN)
@@ -164,14 +168,16 @@ async def read_reminder_status():
         reminders_status_dict = json.loads(json_string)
         reminder24hr_sent = reminders_status_dict['reminder24hr']
         reminder1hr_sent = reminders_status_dict['reminder1hr']
-        print(f'Channel backup read complete')
+        match_started_status = reminders_status_dict['match_started']
+        print(f'Reminder & match status backup read complete')
 
     # If the read fails in any way, set reminders to False as a backup
     # This is not catastrophic, will only send a Reminder again in case of a bot restart
     except:
         reminder24hr_sent = False
         reminder1hr_sent = False
-        print(f'reminder status read FAILED\nReminder set to FALSE')
+        match_started_status = False
+        print(f'reminder & match status read FAILED\nSet all to FALSE')
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -327,6 +333,10 @@ async def check_next_fixture():
                     current_fixture_id = (each['fixture']['id'])
                     currentFixture = each
                     print(f'Match in progress is set to currentFixture')
+                    if not match_started_status:
+                        # match is underway
+                        await match_begin()
+                        await predictions()
                     continue
 
                 # else check if fixture status is not started
@@ -432,7 +442,7 @@ async def reminder():
             await this_channel.send(embed=em)
             print(f'Fixture 24hr reminder sent')
             reminder24hr_sent = True
-            await write_reminder_status()
+            await write_reminder_and_match_status()
 
 
         elif year_diff == 0 and month_diff == 0 and day_diff == 0\
@@ -452,7 +462,7 @@ async def reminder():
             await this_channel.send(embed=em)
             print(f'Fixture 1hr reminder sent')
             reminder1hr_sent = True
-            await write_reminder_status()
+            await write_reminder_and_match_status()
 
 
 
@@ -628,7 +638,10 @@ async def next_fixture():
         reminder24hr_sent = False
         reminder1hr_sent = False
 
-        await write_reminder_status()
+        global match_started_status
+        match_started_status = False
+
+        await write_reminder_and_match_status()
 
         # Grab details for next match
         next_home_team = nextFixture['teams']['home']['name']
@@ -724,7 +737,7 @@ async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
     # Commented out the message in discord to avoid spam as Heroku restarts applications once a day
     # results = f'{bot.user.name} has connected to Discord!'
-    await read_reminder_status()
+    await read_reminder_and_match_status()
     bot_ready = True
     try:
         await read_from_file()
@@ -851,7 +864,7 @@ async def help_next_fixture(ctx):
 # ----------------------------------------------------------------------------------------------------------------------
 @bot.command(name='p', help=f'Submit (or update) your score prediction! e.g. {command_prefix}p 2-1',
              aliases=["predict"])
-async def user_prediction(ctx, score):
+async def user_prediction_command(ctx, score):
     global predictions_updated
     # get current time
     current_time = int(time.time())
@@ -971,88 +984,7 @@ async def score_streak(ctx):
 @bot.command(name='predictions', help='Show all upcoming or current match predictions!',
              aliases=["cpr", "current-predictions"])
 async def current_predictions(ctx):
-    # Create temporary currentPredictions list from Objects rather than globally
-    current_predictions_list = []
-    for each in currentUsersClassList:
-        if each.currentPrediction is None:
-            continue
-        score_and_name = each.currentPrediction + ' - ' + each.username
-        current_predictions_list.append(score_and_name)
-
-    home_team = nextFixture['teams']['home']['name']
-    away_team = nextFixture['teams']['away']['name']
-    competition = nextFixture['league']['name']
-    competition_round = nextFixture['league']['round']
-    competition_icon_url = nextFixture['league']['logo']
-
-    if matchInProgress:
-        home_team = currentFixture['teams']['home']['name']
-        away_team = currentFixture['teams']['away']['name']
-        competition = currentFixture['league']['name']
-        competition_round = currentFixture['league']['round']
-        competition_icon_url = currentFixture['league']['logo']
-
-    # Is the match at Home or Away
-    if home_team == 'West Ham':
-        is_home = True
-        opposition_logo = nextFixture['teams']['away']['logo']
-    else:
-        is_home = False
-        opposition_logo = nextFixture['teams']['home']['logo']
-
-    if matchInProgress:
-        if home_team == 'West Ham':
-            is_home = True
-            opposition_logo = currentFixture['teams']['away']['logo']
-        else:
-            is_home = False
-            opposition_logo = currentFixture['teams']['home']['logo']
-
-    # Combine attributes of each object in UserAndScore class into one string and add to new list
-    # if not current_predictions_list:
-    #     if is_home:
-    #         response = f'No score predictions for **West Ham vs {away_team}**, why not be the first!'
-    #     else:
-    #         response = f'No score predictions for **{home_team} vs West Ham**, why not be the first!'
-    # else:
-    #     if is_home:
-    #         response = f'Here are all the score predictions for **West Ham vs {away_team}**\n\n' \
-    #                    + '\n'.join(current_predictions_list)
-    #     else:
-    #         response = f'Here are all the score predictions for **{home_team} vs West Ham**\n\n' \
-    #                    + '\n'.join(current_predictions_list)
-    # await ctx.send(response)
-
-    embed = discord.Embed(title="Current Predictions", colour=discord.Colour.from_rgb(129, 19, 49))
-
-    if not current_predictions_list:
-        if is_home:
-            response = f'No score predictions for *West Ham vs {away_team}*\n' \
-                       f'in the {competition} ({competition_round})'
-        else:
-            response = f'No score predictions for *{home_team} vs West Ham*\n' \
-                       f'in the {competition} ({competition_round})'
-
-        sub_header = f'Why not be the first to make a guess!'
-        embed.add_field(name=response, value=sub_header)
-
-    else:
-
-        predictions_string = '\n'.join(current_predictions_list)
-
-        if is_home:
-            response = f'Score predictions for *West Ham vs {away_team}*\n' \
-                       f'in the {competition} ({competition_round})'
-        else:
-            response = f'Score predictions for *{home_team} vs West Ham*\n' \
-                       f'in the {competition} ({competition_round})'
-
-        embed.add_field(name=response, value=predictions_string)
-
-    embed.set_thumbnail(url=opposition_logo)
-    embed.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
-
-    await ctx.send(embed=embed)
+    await predictions()
     print(f'A user ({ctx.message.author}) requested upcoming match predictions')
 
 
@@ -1262,53 +1194,128 @@ async def leaderboard():
     this_channel = bot.get_channel(channel_id)
     await this_channel.send(embed=embed)
 
-# #Api-Football - Leagues by team ID & season
-# @bot.command(name='leagues', help='Which competitions are West Ham in?')
-# async def leagues(ctx):
-#     # url = "https://api-football-v1.p.rapidapi.com/v3/leagues"
-#     #
-#     # querystring = {
-#     #     "season": "2021",
-#     #     "team": "48"
-#     # }
-#     #
-#     # headers = {
-#     #     'x-rapidapi-host': "api-football-v1.p.rapidapi.com",
-#     #     'x-rapidapi-key': RAPIDAPIKEY
-#     # }
-#     #
-#     # api_response = requests.request("GET", url, headers=headers, params=querystring)
-#     # data = api_response.text
-#     # fixtures_dict_json = json.loads(data)
-#
-#
-#     try:
-#         with open('leagues_dict_json.json') as leagues_dict_json_file:
-#             leagues_dict_json = json.load(leagues_dict_json_file)
-#         # with open('leagues_dict_json.json', 'rb') as leagues_dict_json_file:
-#         #     leagues_dict_json = pickle.load(leagues_dict_json_file)
-#     except:
-#         leagues_dict_json = []
-#
-#
-#     full_leagues_list = []
-#     for i in leagues_dict_json['response']:
-#         full_leagues_list.append(i)
-#
-#     short_leagues_list = []
-#     for i in full_leagues_list:
-#         league_name = '\n' + (str(i['league']['name']))
-#         short_leagues_list.append(league_name)
-#
-#         #all_league_names = all_league_names + league_name
-#     all_league_names = ''.join(short_leagues_list)
-#     response = 'West Ham are in the following competitions: ' + all_league_names
-#
-#     #Number of leagues
-#     #number_of_leagues = str(response_dict_json['results'])
-#     #response = 'West Ham are in ' + number_of_leagues + ' league/s'
-#
-#     await ctx.send(response)
+
+@bot.event
+async def predictions():
+    # Create temporary currentPredictions list from Objects rather than globally
+    current_predictions_list = []
+    for each in currentUsersClassList:
+        if each.currentPrediction is None:
+            continue
+        score_and_name = each.currentPrediction + ' - ' + each.username
+        current_predictions_list.append(score_and_name)
+
+    home_team = nextFixture['teams']['home']['name']
+    away_team = nextFixture['teams']['away']['name']
+    competition = nextFixture['league']['name']
+    competition_round = nextFixture['league']['round']
+    competition_icon_url = nextFixture['league']['logo']
+
+    if matchInProgress:
+        home_team = currentFixture['teams']['home']['name']
+        away_team = currentFixture['teams']['away']['name']
+        competition = currentFixture['league']['name']
+        competition_round = currentFixture['league']['round']
+        competition_icon_url = currentFixture['league']['logo']
+
+    # Is the match at Home or Away
+    if home_team == 'West Ham':
+        is_home = True
+        opposition_logo = nextFixture['teams']['away']['logo']
+    else:
+        is_home = False
+        opposition_logo = nextFixture['teams']['home']['logo']
+
+    if matchInProgress:
+        if home_team == 'West Ham':
+            is_home = True
+            opposition_logo = currentFixture['teams']['away']['logo']
+        else:
+            is_home = False
+            opposition_logo = currentFixture['teams']['home']['logo']
+
+    # Combine attributes of each object in UserAndScore class into one string and add to new list
+    # if not current_predictions_list:
+    #     if is_home:
+    #         response = f'No score predictions for **West Ham vs {away_team}**, why not be the first!'
+    #     else:
+    #         response = f'No score predictions for **{home_team} vs West Ham**, why not be the first!'
+    # else:
+    #     if is_home:
+    #         response = f'Here are all the score predictions for **West Ham vs {away_team}**\n\n' \
+    #                    + '\n'.join(current_predictions_list)
+    #     else:
+    #         response = f'Here are all the score predictions for **{home_team} vs West Ham**\n\n' \
+    #                    + '\n'.join(current_predictions_list)
+    # await ctx.send(response)
+
+    embed = discord.Embed(title="Current Predictions", colour=discord.Colour.from_rgb(129, 19, 49))
+
+    if not current_predictions_list:
+        if is_home:
+            response = f'No score predictions for *West Ham vs {away_team}*\n' \
+                       f'in the {competition} ({competition_round})'
+        else:
+            response = f'No score predictions for *{home_team} vs West Ham*\n' \
+                       f'in the {competition} ({competition_round})'
+
+        sub_header = f'Why not be the first to make a guess!'
+        embed.add_field(name=response, value=sub_header)
+
+    else:
+
+        predictions_string = '\n'.join(current_predictions_list)
+
+        if is_home:
+            response = f'Score predictions for *West Ham vs {away_team}*\n' \
+                       f'in the {competition} ({competition_round})'
+        else:
+            response = f'Score predictions for *{home_team} vs West Ham*\n' \
+                       f'in the {competition} ({competition_round})'
+
+        embed.add_field(name=response, value=predictions_string)
+
+    embed.set_thumbnail(url=opposition_logo)
+    embed.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
+
+    this_channel = bot.get_channel(channel_id)
+    await this_channel.send(embed=embed)
+
+    #await ctx.send(embed=embed)
+
+@bot.event
+async def match_begin():
+    home_team = currentFixture['teams']['home']['name']
+    away_team = currentFixture['teams']['away']['name']
+    competition = currentFixture['league']['name']
+    competition_round = currentFixture['league']['round']
+    competition_icon_url = currentFixture['league']['logo']
+
+    if home_team == 'West Ham':
+        is_home = True
+        opposition_logo = currentFixture['teams']['away']['logo']
+    else:
+        is_home = False
+        opposition_logo = currentFixture['teams']['home']['logo']
+
+    embed = discord.Embed(title="The match has begun!", colour=discord.Colour.from_rgb(129, 19, 49))
+    if is_home:
+        response = f'*West Ham vs {away_team}*'
+    else:
+        response = f'*{home_team} vs West Ham*'
+
+    embed.add_field(name=response, value=f'TNo more predictions will be accepted')
+
+    embed.set_thumbnail(url=opposition_logo)
+    embed.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
+
+    this_channel = bot.get_channel(channel_id)
+    await this_channel.send(embed=embed)
+    global match_started_status
+    match_started_status = True
+    await write_reminder_and_match_status()
+
+
 
 # Bot Error testing
 # ----------------------------------------------------------------------------------------------------------------------
