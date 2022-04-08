@@ -1026,6 +1026,20 @@ async def clear_users(ctx):
     print(f'Clear_Users run in {ctx.guild.name} ({ctx.guild.id}) by {ctx.message.author}')
 
 
+@bot.command(name='clear-current-predictions',
+             help='Admin Only - Clear ALL current predictions - use with caution')
+@commands.has_permissions(administrator=True)
+async def clear_current_predictions(ctx):
+    for each in currentUsersClassList:
+        each.currentPrediction = None
+    await ctx.send('Current predictions have been cleared from memory')
+
+    await save_to_file()
+    await ctx.send('Database has been updated')
+
+    print(f'Clear_Users run in {ctx.guild.name} ({ctx.guild.id}) by {ctx.message.author}')
+
+
 @bot.command(name='force-backup', help='Admin Only - Force a file backup of the users')
 @commands.has_permissions(administrator=True)
 async def force_backup(ctx):
