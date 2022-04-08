@@ -38,6 +38,9 @@ vignettes/*.pdf
 # R Environment Variables
 .Renviron
 
+# JSON Files
+*.json
+
 # .env files
 .env
 
