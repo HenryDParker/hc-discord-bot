@@ -1288,12 +1288,14 @@ async def predictions():
             response = f'Score predictions for *{home_team} vs West Ham*\n' \
                        f'in the {competition} ({competition_round})'
 
-        # Discord embed field has max limit of 1024
-        if len(predictions_string) < 1024:
-            embed.add_field(name=response, value=predictions_string)
-        else:
-            embed.add_field(name=response, value=f'This field has hit the character limit - I am working on fixing this'
-                                                 f'\nDo not worry, your predictions are safe!')
+        # # Discord embed field has max limit of 1024
+        # if len(predictions_string) < 1024:
+        #     embed.add_field(name=response, value=predictions_string)
+        # else:
+        #     embed.add_field(name=response, value=f'This field has hit the character limit - I am working on fixing this'
+        #                                          f'\nDo not worry, your predictions are safe!')
+        embed.add_field(name=response, value=f'This function has been disabled for now'
+                                             f'\nDo not worry, your predictions are safe!')
 
     embed.set_thumbnail(url=opposition_logo)
     embed.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
