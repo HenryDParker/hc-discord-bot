@@ -14,8 +14,8 @@ def base_request(team_id, current_season, *args, **kwargs):
     fixture_id = kwargs.get('fixture_id', None)
 
     headers_dict = {'x-rapidapi-host': "api-football-v1.p.rapidapi.com", 'x-rapidapi-key': RAPIDAPIKEY}
-    # Query with required parameters
-    querystring_dict = {"season": current_season, "team": team_id}
+    # Query with required parameters & constant optional timezone param
+    querystring_dict = {"season": current_season, "team": team_id, "timezone": "Europe/London"}
 
     # Add optional parameters if passed
     if next_fixture:
