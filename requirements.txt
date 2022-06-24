@@ -13,3 +13,4 @@ typing_extensions==4.0.1
 yarl==1.7.2
 PyGithub~=1.55
 python-dateutil~=2.8.2
+PyMySQL~=1.0.2

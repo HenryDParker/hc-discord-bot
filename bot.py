@@ -7,6 +7,8 @@ import re
 import discord
 import requests
 import time
+import pymysql
+import mysql
 
 from github import Github
 from discord.ext import commands, tasks
@@ -235,7 +237,7 @@ async def check_save():
     global predictions_updated
     if bot_ready:
         if predictions_updated:
-            await save_to_file()
+            await save_to_database()
             predictions_updated = False
 
 
@@ -563,7 +565,7 @@ async def give_results():
             for each in currentUsersClassList:
                 each.currentPrediction = None
             # write class to file
-            await save_to_file()
+            await save_to_database()
 
             # Send leaderboard after results given
             await leaderboard()
@@ -580,7 +582,7 @@ async def null_result(null_fixture_status):
     for each in currentUsersClassList:
         each.currentPrediction = None
     # write class to file
-    await save_to_file()
+    await save_to_database()
 
     if null_fixture_status == 'ABD':
         response = f'The match was abandoned'
@@ -607,7 +609,7 @@ async def postponed_fixture(postponed_fixture_status):
     for each in currentUsersClassList:
         each.currentPrediction = None
     # write class to file
-    await save_to_file()
+    await save_to_database()
 
     if postponed_fixture_status == 'PST':
         response = f'The upcoming match has been postponed'
@@ -740,7 +742,7 @@ async def on_ready():
     await read_reminder_and_match_status()
     bot_ready = True
     try:
-        await read_from_file()
+        await read_from_database()
     except:
         currentUsersClassList = []
         print(f'currentUsersClass has been set to empty as file read failed')
@@ -1020,7 +1022,7 @@ async def clear_users(ctx):
     currentUsersClassList.clear()
     await ctx.send('Memory has been cleared')
 
-    await save_to_file()
+    await save_to_database()
     await ctx.send('Files have been cleared')
 
     print(f'Clear_Users run in {ctx.guild.name} ({ctx.guild.id}) by {ctx.message.author}')
@@ -1034,7 +1036,7 @@ async def clear_current_predictions(ctx):
         each.currentPrediction = None
     await ctx.send('Current predictions have been cleared from memory')
 
-    await save_to_file()
+    await save_to_database()
     await ctx.send('Database has been updated')
 
     print(f'Clear_Users run in {ctx.guild.name} ({ctx.guild.id}) by {ctx.message.author}')
@@ -1043,16 +1045,23 @@ async def clear_current_predictions(ctx):
 @bot.command(name='force-backup', help='Admin Only - Force a file backup of the users')
 @commands.has_permissions(administrator=True)
 async def force_backup(ctx):
-    await save_to_file()
-    await ctx.send('Users backed up to file')
+    await save_to_database()
+    await ctx.send('Users backed up to database')
 
     print(f'Force backup run in {ctx.guild.name} ({ctx.guild.id}) by {ctx.message.author}')
+
+@bot.command(name='force-dbsync', help='Admin Only - Force a database sync')
+@commands.has_permissions(administrator=True)
+async def force_dbsync(ctx):
+    await read_from_database()
+    await ctx.send('Users synced with database')
+
+    print(f'Db sync run in {ctx.guild.name} ({ctx.guild.id}) by {ctx.message.author}')
 
 
 # Writing and reading Users to Github as storage
 # ----------------------------------------------------------------------------------------------------------------------
-async def save_to_file():
-    # create "data" and save all objects in currentUsersClassList in a nested dict
+async def save_to_database():
     data = {'Users': []}
     for each in currentUsersClassList:
         data['Users'].append({
@@ -1066,69 +1075,59 @@ async def save_to_file():
             'longestPredictionStreak': each.longestPredictionStreak
         })
 
-    # perform local write (NO READ) for testing purposes
-    with open('users.json', 'w') as outfile:
-        json.dump(data, outfile, indent=2)
-
-    # convert "data" to a json_string and send this to 'hc-bot-memory' repo on GitHub for backup
-    json_string = json.dumps(data)
-    github = Github(GITHUBTOKEN)
-    repository = github.get_user().get_repo('hc-bot-memory')
-    filename = 'users.json'
-    contents = repository.get_contents("")
-    all_files = []
-
-    # check all values in contents
-    while contents:
-        # take first value as file_content
-        file_content = contents.pop(0)
-        # if file_content is a directory (shouldn't ever be)
-        if file_content.type == "dir":
-            contents.extend(repository.get_contents(file_content.path))
-        # else must be a file
-        else:
-            file = file_content
-            # remove extra text to create clean file name for comparison
-            all_files.append(str(file).replace('ContentFile(path="', '').replace('")', ''))
-
-    # check if filename matches in all_files list - if yes then update, if no then create
     try:
-        if filename in all_files:
-            contents = repository.get_contents(filename)
-            repository.update_file(filename, "Updated predictions file", json_string, contents.sha)
-        else:
-            repository.create_file(filename, "Created predictions file", json_string)
-        print(f'Users save to file successful')
+        sql_query = '''select * from users'''
+        mysql.cursor.execute(sql_query)
+        data = mysql.cursor.fetchall()
+        sql_query = '''
+                    INSERT INTO users (mentionName, username, currentPrediction, predictionTimestamp,
+                    numCorrectPredictions, previousPredictionCorrect, predictionStreak, longestPredictionStreak)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    '''
+        for each in currentUsersClassList:
+            if each.currentPrediction is None:
+                each.currentPrediction = "None"
+            if each.previousPredictionCorrect:
+                each.previousPredictionCorrect = 1
+            else:
+                each.previousPredictionCorrect = 0
+            currentUserList = [each.mentionName,
+                               each.username,
+                               each.currentPrediction,
+                               each.predictionTimestamp,
+                               each.numCorrectPredictions,
+                               each.previousPredictionCorrect,
+                               each.predictionStreak,
+                               each.longestPredictionStreak]
+            mysql.cursor.execute(sql_query, currentUserList)
+            mysql.db.commit()
+
+        print(f'database write success')
     except:
-        print(f'Users save to file FAILED')
+        print(f'database write failed')
 
 
-async def read_from_file():
+
+async def read_from_database():
     try:
-        # download file from Github repo 'hc-bot-memory' and decode to json_string
-        github = Github(GITHUBTOKEN)
-        repository = github.get_user().get_repo('hc-bot-memory')
-        filename = 'users.json'
-        file = repository.get_contents(filename)
-        json_string = file.decoded_content.decode()
-        # convert json_string to "data", nested dict
-        data = json.loads(json_string)
-        # set "data" to currentUsersClassList
-        for each in data['Users']:
-            new_user = UserAndScore(each['mentionName'],
-                                    each['username'],
-                                    each['currentPrediction'],
-                                    each['predictionTimestamp'],
-                                    each['numCorrectPredictions'],
-                                    each['previousPredictionCorrect'],
-                                    each['predictionStreak'],
-                                    each['longestPredictionStreak'])
+        sql_query = '''select mentionName,username, currentPrediction, predictionTimestamp,
+         numCorrectPredictions, previousPredictionCorrect, predictionStreak, longestPredictionStreak from users'''
+        mysql.cursor.execute(sql_query)
+        data = mysql.cursor.fetchall()
+        for each in data:
+            new_user = UserAndScore(each[0],
+                                    each[1],
+                                    each[2],
+                                    each[3],
+                                    each[4],
+                                    each[5],
+                                    each[6],
+                                    each[7])
             currentUsersClassList.append(new_user)
-        print(f'Users save to file successful')
-    # if fail due to empty file, clear currentUsersClassList to an empty list
-    except json.decoder.JSONDecodeError:
-        currentUsersClassList.clear()
-        print(f'Users save to file FAILED - or empty file')
+        print(f'database read success')
+    except:
+        print(f'database read failed')
+
 
 
 async def save_error_to_file(error_string):
@@ -1352,6 +1351,8 @@ async def on_error(event, *args, **kwargs):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
+
+
 
 
 check_fixtures.start()
