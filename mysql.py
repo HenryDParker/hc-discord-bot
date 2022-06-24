@@ -1,9 +1,14 @@
 import pymysql
+import os
+from dotenv import load_dotenv
 
-ENDPOINT = "db-scorepredictor.cesiamq9hubf.eu-west-2.rds.amazonaws.com"
+load_dotenv()
+
+PASSWORD = os.getenv('AWS_DB_PASS')
+ENDPOINT = os.getenv('AWS_DB_ENDPOINT')
+
 PORT = 3306
 USER = "admin"
-PASSWORD = "QJ4NCV&pnj6j"
 REGION = "eu-west-2"
 DBNAME = "scorepredictor"
 
