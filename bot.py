@@ -234,13 +234,16 @@ async def check_fixtures():
             print(f'API Fixture check FAILED')
 
 
-@tasks.loop(minutes=60)
-async def check_next_fixture_api():
+async def get_next_fixture_id():
     timenow = datetime.now()
     #if timenow.hour = 1:
         # do the check
     response = api_call.base_request(team_id, 2022, next_fixture=True)
     print(response)
+    # return next fixture I
+    next_fixture_id = response['response'][0]['fixture']['id']
+    print(next_fixture_id)
+    return next_fixture_id
 
 
 # looping every 10 minutes
@@ -741,7 +744,7 @@ async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
     # Commented out the message in discord to avoid spam as Heroku restarts applications once a day
     # results = f'{bot.user.name} has connected to Discord!'
-    await check_next_fixture_api()
+    await get_next_fixture_id()
     await read_reminder_and_match_status()
     bot_ready = True
     try:
