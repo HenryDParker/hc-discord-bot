@@ -8,7 +8,10 @@ import discord
 import requests
 import time
 import pymysql
+
+# import files
 import mysql
+import api_call
 
 from github import Github
 from discord.ext import commands, tasks
@@ -84,6 +87,7 @@ reminder24hr_sent = False
 reminder1hr_sent = False
 match_started_status = False
 
+team_id = 48
 west_ham_logo = "https://media.api-sports.io/football/teams/48.png"
 predictor_bot_logo = "https://i.imgur.com/9runQEU.png"
 
@@ -193,7 +197,6 @@ async def check_fixtures():
     # Only perform this check after 7am and stop at 2am - can be removed if necessary
     # This will save API calls as few changes to West Ham fixture will occur between these times
     timenow = datetime.now()
-    #global match_today
     if timenow.hour <= 2 or timenow.hour >= 7:
         # find today's date
         today = date.today()
@@ -229,6 +232,15 @@ async def check_fixtures():
             print(f'API Fixture check complete')
         except:
             print(f'API Fixture check FAILED')
+
+
+@tasks.loop(minutes=60)
+async def check_next_fixture_api():
+    timenow = datetime.now()
+    #if timenow.hour = 1:
+        # do the check
+    response = api_call.base_request(team_id, 2022, next_fixture=True)
+    print(response)
 
 
 # looping every 10 minutes
@@ -721,16 +733,6 @@ async def fixture_today(current_date, fixture_date):
     else:
         return False
 
-
-# @bot.event
-# async def write_match_in_progress():
-#     if matchInProgress:
-#         if not match_written_to_file:
-#             # save to file
-#             match_written_to_file = True
-
-
-
 # When the bot joins a server
 @bot.event
 async def on_ready():
@@ -739,6 +741,7 @@ async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
     # Commented out the message in discord to avoid spam as Heroku restarts applications once a day
     # results = f'{bot.user.name} has connected to Discord!'
+    await check_next_fixture_api()
     await read_reminder_and_match_status()
     bot_ready = True
     try:
