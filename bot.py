@@ -243,14 +243,19 @@ async def get_next_fixture_id():
 
 
 async def get_next_fixture_datetime(next_fixture_id):
+    # Get time now and in London timezone and create DT object from it
     timenow_datetime_string = datetime.now(tz).strftime("%Y-%m-%dT%H:%M:%S%z")
     timenow_datetime = datetime.strptime(timenow_datetime_string, "%Y-%m-%dT%H:%M:%S%z")
-    response = api_call.base_request(fixture_id=next_fixture_id, timezone="Europe/London")
 
+    # Call API for next fixture in London timezone and create DT object from it
+    response = api_call.base_request(fixture_id=next_fixture_id, timezone="Europe/London")
     next_fixture_datetime_string = response['response'][0]['fixture']['date']
     next_fixture_datetime = datetime.strptime(next_fixture_datetime_string, "%Y-%m-%dT%H:%M:%S%z")
+
+    # Print out times for troubleshooting
     print(f'Current Time String: {timenow_datetime_string}\nCurrent Time datetime: {timenow_datetime}\nNext Fixture String: {next_fixture_datetime_string}\nNext Fixture datetime: {next_fixture_datetime}')
 
+    # Finding difference between now and next fixture time for testing/troubleshooting
     delta = next_fixture_datetime - timenow_datetime
     print(f'The next fixture is {delta.days} days away, on {next_fixture_datetime.date()} at {next_fixture_datetime.time()}')
     return next_fixture_datetime

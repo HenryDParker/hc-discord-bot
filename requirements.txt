@@ -14,3 +14,5 @@ yarl==1.7.2
 PyGithub~=1.55
 python-dateutil~=2.8.2
 PyMySQL~=1.0.2
+pytz~=2022.1
+mysql~=0.0.3
