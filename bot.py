@@ -7,7 +7,7 @@ import re
 import discord
 import requests
 import time
-import pymysql
+import pytz
 
 # import files
 import mysql
@@ -92,8 +92,10 @@ west_ham_logo = "https://media.api-sports.io/football/teams/48.png"
 predictor_bot_logo = "https://i.imgur.com/9runQEU.png"
 
 # Setting up timezones
-utc_tz = tz.gettz('UTC')
-uk_tz = tz.gettz('Europe/London')
+tz = pytz.timezone('Europe/London')
+
+#utc_tz = tz.gettz('UTC')
+#uk_tz = tz.gettz('Europe/London')
 
 # channel_id pulled from admin using {command_prefix}channel
 # then stored in a dict & external json file on Github for any restarts
@@ -235,15 +237,23 @@ async def check_fixtures():
 
 
 async def get_next_fixture_id():
-    timenow = datetime.now()
-    #if timenow.hour = 1:
-        # do the check
-    response = api_call.base_request(team_id, 2022, next_fixture=True)
-    print(response)
-    # return next fixture I
+    response = api_call.base_request(team_id=team_id, season=2022, next_fixture=True, timezone="Europe/London")
     next_fixture_id = response['response'][0]['fixture']['id']
-    print(next_fixture_id)
     return next_fixture_id
+
+
+async def get_next_fixture_datetime(next_fixture_id):
+    timenow_datetime_string = datetime.now(tz).strftime("%Y-%m-%dT%H:%M:%S%z")
+    timenow_datetime = datetime.strptime(timenow_datetime_string, "%Y-%m-%dT%H:%M:%S%z")
+    response = api_call.base_request(fixture_id=next_fixture_id, timezone="Europe/London")
+
+    next_fixture_datetime_string = response['response'][0]['fixture']['date']
+    next_fixture_datetime = datetime.strptime(next_fixture_datetime_string, "%Y-%m-%dT%H:%M:%S%z")
+    print(f'Current Time String: {timenow_datetime_string}\nCurrent Time datetime: {timenow_datetime}\nNext Fixture String: {next_fixture_datetime_string}\nNext Fixture datetime: {next_fixture_datetime}')
+
+    delta = next_fixture_datetime - timenow_datetime
+    print(f'The next fixture is {delta.days} days away, on {next_fixture_datetime.date()} at {next_fixture_datetime.time()}')
+    return next_fixture_datetime
 
 
 # looping every 10 minutes
@@ -744,7 +754,8 @@ async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
     # Commented out the message in discord to avoid spam as Heroku restarts applications once a day
     # results = f'{bot.user.name} has connected to Discord!'
-    await get_next_fixture_id()
+    next_fixture_id = await get_next_fixture_id()
+    await get_next_fixture_datetime(next_fixture_id)
     await read_reminder_and_match_status()
     bot_ready = True
     try:

@@ -9,15 +9,27 @@ url_fixtures = "https://api-football-v1.p.rapidapi.com/v3/fixtures"
 
 # Creates the API request based on parameters passed in
 
-def base_request(team_id, current_season, *args, **kwargs):
+def base_request(*args, **kwargs):
+    team_id = kwargs.get('team_id', None)
+    season = kwargs.get('season', None)
     next_fixture = kwargs.get('next_fixture', False)
     fixture_id = kwargs.get('fixture_id', None)
+    timezone = kwargs.get('timezone', None)
 
     headers_dict = {'x-rapidapi-host': "api-football-v1.p.rapidapi.com", 'x-rapidapi-key': RAPIDAPIKEY}
     # Query with required parameters & constant optional timezone param
-    querystring_dict = {"season": current_season, "team": team_id, "timezone": "Europe/London"}
+    querystring_dict = {}
 
     # Add optional parameters if passed
+    if team_id:
+        querystring_dict["team"] = team_id
+
+    if season:
+        querystring_dict["season"] = season
+
+    if timezone:
+        querystring_dict["timezone"] = timezone
+
     if next_fixture:
         next_fixture = 1
         querystring_dict["next"] = next_fixture
