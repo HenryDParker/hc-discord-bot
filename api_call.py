@@ -40,6 +40,7 @@ def base_request(*args, **kwargs):
 
     try:
         api_response = requests.request("GET", url_fixtures, headers=headers_dict, params=querystring_dict)
+        print(f'API CALL')
         data = api_response.text
 
     except requests.exceptions.HTTPError as err:

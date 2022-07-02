@@ -6,7 +6,6 @@ import string
 import re
 import discord
 import time
-import pytz
 
 from github import Github
 from discord.ext import commands, tasks
@@ -16,6 +15,7 @@ from datetime import datetime, date
 # import files
 import mysql
 import api_call
+import time_functions
 from users import UserAndScore
 
 
@@ -61,17 +61,21 @@ predictions_updated = False
 current_fixture_id = None
 reminder24hr_sent = False
 reminder1hr_sent = False
-match_started_status = False
+fixture_active = False
+next_fixture_details = None
+next_fixture_datetime = time_functions.local_time_now()
+next_fixture_id = None
+live_fixture_details = None
+fixture_today = False
+
+
 
 team_id = 48
 west_ham_logo = "https://media.api-sports.io/football/teams/48.png"
 predictor_bot_logo = "https://i.imgur.com/9runQEU.png"
 
 # Setting up timezones
-timezone = pytz.timezone('Europe/London')
-
-# utc_tz = tz.gettz('UTC')
-# uk_tz = tz.gettz('Europe/London')
+# timezone = pytz.timezone('Europe/London')
 
 # channel_id pulled from admin using {command_prefix}channel
 # then stored in a dict & external json file on Github for any restarts
@@ -94,11 +98,15 @@ scorePatternHigh = re.compile('^[0-9]{1,5}-[0-9]{1,5}$')
 @bot.event
 async def on_ready():
     global bot_ready
-    global currentUsersClassList
     print(f'{bot.user.name} has connected to Discord!')
-    await get_next_fixture()
+
+    await get_next_fixture_details()
+    await is_next_fixture_today()
+
     await read_from_database()
+
     await set_status()
+
     bot_ready = True
 
 
@@ -107,11 +115,12 @@ async def on_ready():
 # Get next fixture details once per day between 01:00 and 01:59
 @tasks.loop(minutes=60)
 async def get_next_fixture_loop():
-    if datetime.now(timezone).hour == 1:
-        await get_next_fixture()
+    if time_functions.local_time_now().hour == 22:
+        await get_next_fixture_details()
+        await is_next_fixture_today()
 
 
-async def get_next_fixture():
+async def get_next_fixture_details():
     today = date.today()
     # set the month to an int e.g. 02
     today_month = int(today.strftime("%m"))
@@ -125,61 +134,77 @@ async def get_next_fixture():
         current_season = today_year
     # Try the calculated year and if no results, the next year
     for each in range(2):
-        response = api_call.base_request(team_id=team_id, season=current_season, next_fixture=True, timezone="Europe/London")
+        response = api_call.base_request(team_id=team_id, season=current_season,
+                                         next_fixture=True, timezone="Europe/London")
         if response['results'] == 0:
             current_season += 1
         else:
-            fixture_details = response['response'][0]
-            next_fixture_id = response['response'][0]['fixture']['id']
-            print(f'Fixture ID = {next_fixture_id}\n\nFull details =\n{fixture_details}')
+            global next_fixture_details
+            next_fixture_details = response['response'][0]
+            global next_fixture_id
+            next_fixture_id = next_fixture_details['fixture']['id']
             break
 
 
 async def get_fixture_details_from_id(fixture_id):
     response = api_call.base_request(fixture_id=fixture_id, timezone="Europe/London")
     if response['results'] == 0:
-        next_fixture_id = None
+        fixture_details = None
     else:
-        next_fixture_details = response
-        next_fixture_id = response['response'][0]['fixture']['id']
-    return next_fixture_id
+        fixture_details = response
+    return fixture_details
 
 
-async def get_next_fixture_datetime(next_fixture_id):
-    # Get time now and in London timezone and create DT object from it
-    timenow_datetime_string = datetime.now(timezone).strftime("%Y-%m-%dT%H:%M:%S%z")
-    timenow_datetime = datetime.strptime(timenow_datetime_string, "%Y-%m-%dT%H:%M:%S%z")
+async def is_next_fixture_today():
+    global next_fixture_details
+    # noinspection PyTypeChecker
+    next_fixture_datetime_string = next_fixture_details['fixture']['date']
+    # Convert date to datetime object
+    global next_fixture_datetime
+    next_fixture_datetime = time_functions.convert_time(next_fixture_datetime_string)
+    timenow_datetime = time_functions.local_time_now()
+    delta = time_functions.days_delta(next_fixture_datetime, timenow_datetime)
 
-    # Call API for next fixture in London timezone and create DT object from it
-    response = api_call.base_request(fixture_id=next_fixture_id, timezone="Europe/London")
-    next_fixture_datetime_string = response['response'][0]['fixture']['date']
-    next_fixture_datetime = datetime.strptime(next_fixture_datetime_string, "%Y-%m-%dT%H:%M:%S%z")
+    global fixture_today
+    if delta == 0:
+        fixture_today = True
+    else:
+        fixture_today = True
 
-    # Print out times for troubleshooting
-    print(
-        f'Current Time String: {timenow_datetime_string}\nCurrent Time datetime: {timenow_datetime}\nNext Fixture String: {next_fixture_datetime_string}\nNext Fixture datetime: {next_fixture_datetime}')
+# This is convoluted still - too much of this is checking if match is live and not just GETTING DETAILS
+# but the functionality works - just needs to be broken out to the correct places
 
-    # Finding difference between now and next fixture time for testing/troubleshooting
-    delta = next_fixture_datetime - timenow_datetime
-    print(
-        f'The next fixture is {delta.days} days away, on {next_fixture_datetime.date()} at {next_fixture_datetime.time()}')
-    return next_fixture_datetime
+@tasks.loop(minutes=5)
+async def get_live_fixture_details():
+    if bot_ready:
+        if fixture_today:
+            global next_fixture_datetime
+            fixture_time = next_fixture_datetime.time()
+            now_time = time_functions.local_time_now().time()
+
+            global fixture_active
+            if fixture_time < now_time:
+                print(f'{fixture_time} is before {now_time}')
+                fixture_active = False
+            else:
+                print(f'{fixture_time} is after {now_time}')
+                fixture_active = True
+            await get_fixture_details_from_id(fixture_id=next_fixture_id)
+            global live_fixture_details
 
 
-
-
-
-# looping every 10 minutes
 @tasks.loop(minutes=10)
 async def check_save():
-    global predictions_updated
     if bot_ready:
+        global predictions_updated
         if predictions_updated:
             await save_to_database()
             predictions_updated = False
 
 
-# looping every minute
+
+
+####### OLD CHECK FIXTURE METHOD ########
 @tasks.loop(minutes=1)
 async def check_next_fixture():
     # This was causing excessive logging - would be useful if logs were stored locally
@@ -273,7 +298,7 @@ async def check_next_fixture():
                     current_fixture_id = (each['fixture']['id'])
                     currentFixture = each
                     print(f'Match in progress is set to currentFixture')
-                    if not match_started_status:
+                    if not fixture_active:
                         # match is underway
                         await match_begin()
                         await predictions()
@@ -574,8 +599,8 @@ async def next_fixture():
         reminder24hr_sent = False
         reminder1hr_sent = False
 
-        global match_started_status
-        match_started_status = False
+        global fixture_active
+        fixture_active = False
 
         # await write_reminder_and_match_status()
 
@@ -648,12 +673,12 @@ async def next_fixture():
         print(f'Next fixture information sent')
 
 
-@bot.event
-async def fixture_today(current_date, fixture_date):
-    if current_date == fixture_date:
-        return True
-    else:
-        return False
+# @bot.event
+# async def fixture_today(current_date, fixture_date):
+#     if current_date == fixture_date:
+#         return True
+#     else:
+#         return False
 
 
 # Set bot status
@@ -1234,8 +1259,8 @@ async def match_begin():
 
     this_channel = bot.get_channel(channel_id)
     await this_channel.send(embed=embed)
-    global match_started_status
-    match_started_status = True
+    global fixture_active
+    fixture_active = True
     # await write_reminder_and_match_status()
 
 
@@ -1256,6 +1281,7 @@ async def on_error(event, *args, **kwargs):
 
 get_next_fixture_loop.start()
 check_next_fixture.start()
+get_live_fixture_details.start()
 check_save.start()
 reminder.start()
 
