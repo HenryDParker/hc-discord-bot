@@ -5,19 +5,19 @@ import random
 import string
 import re
 import discord
-import requests
 import time
 import pytz
-
-# import files
-import mysql
-import api_call
 
 from github import Github
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
 from datetime import datetime, date
-from dateutil import tz
+
+# import files
+import mysql
+import api_call
+from users import UserAndScore
+
 
 # URL to invite TEST bot
 # https://discord.com/api/oauth2/authorize?client_id=946767991670997052&permissions=274878114880&scope=bot
@@ -27,7 +27,6 @@ from dateutil import tz
 
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
-# GUILD = os.getenv('DISCORD_GUILD')
 RAPIDAPIKEY = os.getenv('RAPIDAPI_KEY')
 GITHUBTOKEN = os.getenv('GITHUB_TOKEN')
 channel_id = int(os.getenv('CHANNEL_ID'))
@@ -40,35 +39,12 @@ bot = commands.Bot(command_prefix=command_prefix)
 # Remove default help command
 bot.remove_command("help")
 
-
-# Set up UserAndScore class
-class UserAndScore:
-    def __init__(self,
-                 mentionName: str,
-                 username: str,
-                 currentPrediction,
-                 predictionTimestamp,
-                 numCorrectPredictions: int,
-                 previousPredictionCorrect: bool,
-                 predictionStreak: int,
-                 longestPredictionStreak: int):
-        self.mentionName = mentionName
-        self.username = username
-        self.currentPrediction = currentPrediction
-        self.predictionTimestamp = predictionTimestamp
-        self.numCorrectPredictions = numCorrectPredictions
-        self.previousPredictionCorrect = previousPredictionCorrect
-        self.predictionStreak = predictionStreak
-        self.longestPredictionStreak = longestPredictionStreak
-
-
 # Global Lists
 currentUsersClassList = []
 
 # Global Dictionaries
 currentFixture = {}
 nextFixture = {}
-#discord_channels = {}
 
 # list of responses to a correct score format
 correct_score_format = [
@@ -92,10 +68,10 @@ west_ham_logo = "https://media.api-sports.io/football/teams/48.png"
 predictor_bot_logo = "https://i.imgur.com/9runQEU.png"
 
 # Setting up timezones
-tz = pytz.timezone('Europe/London')
+timezone = pytz.timezone('Europe/London')
 
-#utc_tz = tz.gettz('UTC')
-#uk_tz = tz.gettz('Europe/London')
+# utc_tz = tz.gettz('UTC')
+# uk_tz = tz.gettz('Europe/London')
 
 # channel_id pulled from admin using {command_prefix}channel
 # then stored in a dict & external json file on Github for any restarts
@@ -113,138 +89,65 @@ scorePattern = re.compile('^[0-9]{1,2}-[0-9]{1,2}$')
 scorePatternHigh = re.compile('^[0-9]{1,5}-[0-9]{1,5}$')
 
 
-# Reminder status storage and backup
-# ----------------------------------------------------------------------------------------------------------------------
-async def write_reminder_and_match_status():
-    # perform local write (NO READ) for testing purposes
-    global reminder24hr_sent
-    global reminder1hr_sent
-    global match_started_status
-    reminders_status_dict = {
-        "reminder24hr": reminder24hr_sent,
-        "reminder1hr": reminder1hr_sent,
-        "match_started": match_started_status
-    }
 
-
-    with open('reminder_status.json', 'w') as outfile:
-        json.dump(reminders_status_dict, outfile, indent=2)
-
-    # convert "data" to a json_string and send this to 'hc-bot-memory' repo on GitHub for backup
-    json_string = json.dumps(reminders_status_dict)
-    github = Github(GITHUBTOKEN)
-    repository = github.get_user().get_repo('hc-bot-memory')
-    filename = 'reminder_status.json'
-    contents = repository.get_contents("")
-    all_files = []
-
-    # check all values in contents
-    while contents:
-        # take first value as file_content
-        file_content = contents.pop(0)
-        # if file_content is a directory (shouldn't ever be)
-        if file_content.type == "dir":
-            contents.extend(repository.get_contents(file_content.path))
-        # else must be a file
-        else:
-            file = file_content
-            # remove extra text to create clean file name for comparison
-            all_files.append(str(file).replace('ContentFile(path="', '').replace('")', ''))
-
-    # check if filename matches in all_files list - if yes then update, if no then create
-    if filename in all_files:
-        contents = repository.get_contents(filename)
-        repository.update_file(filename, "Updated reminder_status file", json_string, contents.sha)
-    else:
-        repository.create_file(filename, "Created reminder_status file", json_string)
-    print(f'Reminder status write complete')
-
-
-async def read_reminder_and_match_status():
-    global reminder24hr_sent
-    global reminder1hr_sent
-    global match_started_status
-    try:
-        # download file from Github repo 'hc-bot-memory' and decode to json_string
-        github = Github(GITHUBTOKEN)
-        repository = github.get_user().get_repo('hc-bot-memory')
-        filename = 'reminder_status.json'
-        file = repository.get_contents(filename)
-        json_string = file.decoded_content.decode()
-
-        # convert json_file to "reminders_status"
-        reminders_status_dict = json.loads(json_string)
-        reminder24hr_sent = reminders_status_dict['reminder24hr']
-        reminder1hr_sent = reminders_status_dict['reminder1hr']
-        match_started_status = reminders_status_dict['match_started']
-        print(f'Reminder & match status backup read complete')
-
-    # If the read fails in any way, set reminders to False as a backup
-    # This is not catastrophic, will only send a Reminder again in case of a bot restart
-    except:
-        reminder24hr_sent = False
-        reminder1hr_sent = False
-        match_started_status = False
-        print(f'reminder & match status read FAILED\nSet all to FALSE')
-
-
-# ----------------------------------------------------------------------------------------------------------------------
+# When the bot joins the server
+@bot.event
+async def on_ready():
+    global bot_ready
+    global currentUsersClassList
+    print(f'{bot.user.name} has connected to Discord!')
+    await get_next_fixture()
+    await read_from_database()
+    await set_status()
+    bot_ready = True
 
 
 # Timed tasks
 # ----------------------------------------------------------------------------------------------------------------------
-# Check fixture info every quarter-hour
-@tasks.loop(minutes=15)
-async def check_fixtures():
-    # Only perform this check after 7am and stop at 2am - can be removed if necessary
-    # This will save API calls as few changes to West Ham fixture will occur between these times
-    timenow = datetime.now()
-    if timenow.hour <= 2 or timenow.hour >= 7:
-        # find today's date
-        today = date.today()
-        # set the month to an int e.g. 02
-        today_month = int(today.strftime("%m"))
-        # set the year to an int e.g. 2021
-        today_year = int(today.strftime("%Y"))
+# Get next fixture details once per day between 01:00 and 01:59
+@tasks.loop(minutes=60)
+async def get_next_fixture_loop():
+    if datetime.now(timezone).hour == 1:
+        await get_next_fixture()
 
-        # if the month is less than 6, set the current_season to the current year, -1
-        # e.g in 03/2022 the season is 2021
-        if today_month < 6:
-            current_season = today_year - 1
+
+async def get_next_fixture():
+    today = date.today()
+    # set the month to an int e.g. 02
+    today_month = int(today.strftime("%m"))
+    # set the year to an int e.g. 2021
+    today_year = int(today.strftime("%Y"))
+    # if the month is less than 6, set the current_season to the current year, -1
+    # e.g in 03/2022 the season is 2021
+    if today_month < 6:
+        current_season = today_year - 1
+    else:
+        current_season = today_year
+    # Try the calculated year and if no results, the next year
+    for each in range(2):
+        response = api_call.base_request(team_id=team_id, season=current_season, next_fixture=True, timezone="Europe/London")
+        if response['results'] == 0:
+            current_season += 1
         else:
-            current_season = today_year
-
-        # API call to get team fixtures for current Season
-        url_fixtures = "https://api-football-v1.p.rapidapi.com/v3/fixtures"
-
-        querystring_fixtures = {"season": current_season, "team": "48"}
-
-        headers_fixtures = {
-            'x-rapidapi-host': "api-football-v1.p.rapidapi.com",
-            'x-rapidapi-key': RAPIDAPIKEY
-        }
-
-        api_response = requests.request("GET", url_fixtures, headers=headers_fixtures, params=querystring_fixtures)
-        data = api_response.text
-        fixtures_dict_json = json.loads(data)
-
-        try:
-            with open('fixtures_dict_json.json', 'w') as f:
-                json.dump(fixtures_dict_json, f)
-            print(f'API Fixture check complete')
-        except:
-            print(f'API Fixture check FAILED')
+            fixture_details = response['response'][0]
+            next_fixture_id = response['response'][0]['fixture']['id']
+            print(f'Fixture ID = {next_fixture_id}\n\nFull details =\n{fixture_details}')
+            break
 
 
-async def get_next_fixture_id():
-    response = api_call.base_request(team_id=team_id, season=2022, next_fixture=True, timezone="Europe/London")
-    next_fixture_id = response['response'][0]['fixture']['id']
+async def get_fixture_details_from_id(fixture_id):
+    response = api_call.base_request(fixture_id=fixture_id, timezone="Europe/London")
+    if response['results'] == 0:
+        next_fixture_id = None
+    else:
+        next_fixture_details = response
+        next_fixture_id = response['response'][0]['fixture']['id']
     return next_fixture_id
 
 
 async def get_next_fixture_datetime(next_fixture_id):
     # Get time now and in London timezone and create DT object from it
-    timenow_datetime_string = datetime.now(tz).strftime("%Y-%m-%dT%H:%M:%S%z")
+    timenow_datetime_string = datetime.now(timezone).strftime("%Y-%m-%dT%H:%M:%S%z")
     timenow_datetime = datetime.strptime(timenow_datetime_string, "%Y-%m-%dT%H:%M:%S%z")
 
     # Call API for next fixture in London timezone and create DT object from it
@@ -253,12 +156,17 @@ async def get_next_fixture_datetime(next_fixture_id):
     next_fixture_datetime = datetime.strptime(next_fixture_datetime_string, "%Y-%m-%dT%H:%M:%S%z")
 
     # Print out times for troubleshooting
-    print(f'Current Time String: {timenow_datetime_string}\nCurrent Time datetime: {timenow_datetime}\nNext Fixture String: {next_fixture_datetime_string}\nNext Fixture datetime: {next_fixture_datetime}')
+    print(
+        f'Current Time String: {timenow_datetime_string}\nCurrent Time datetime: {timenow_datetime}\nNext Fixture String: {next_fixture_datetime_string}\nNext Fixture datetime: {next_fixture_datetime}')
 
     # Finding difference between now and next fixture time for testing/troubleshooting
     delta = next_fixture_datetime - timenow_datetime
-    print(f'The next fixture is {delta.days} days away, on {next_fixture_datetime.date()} at {next_fixture_datetime.time()}')
+    print(
+        f'The next fixture is {delta.days} days away, on {next_fixture_datetime.date()} at {next_fixture_datetime.time()}')
     return next_fixture_datetime
+
+
+
 
 
 # looping every 10 minutes
@@ -275,7 +183,7 @@ async def check_save():
 @tasks.loop(minutes=1)
 async def check_next_fixture():
     # This was causing excessive logging - would be useful if logs were stored locally
-    #print(f'Check next fixture')
+    # print(f'Check next fixture')
     global matchInProgress
     with open("fixtures_dict_json.json", "r") as read_file:
         all_fixtures = json.load(read_file)
@@ -358,7 +266,7 @@ async def check_next_fixture():
                         or fixture_status == 'P' \
                         or fixture_status == 'BT' \
                         or fixture_status == 'LIVE' \
-                        or fixture_status == 'INT'\
+                        or fixture_status == 'INT' \
                         or fixture_status == 'SUSP':
                     matchInProgress = True
                     # get fixture id
@@ -381,7 +289,7 @@ async def check_next_fixture():
                         shortest_time_diff = time_difference
                         global nextFixture
                         nextFixture = each
-                        #print(f'Upcoming fixture set to nextFixture')
+                        # print(f'Upcoming fixture set to nextFixture')
 
                     else:
                         # no, continue to next fixture
@@ -407,95 +315,92 @@ async def check_next_fixture():
             print(f'Cannot find fixture info - all_fixtures dict')
 
 
-
 # 24hrs reminder
 @tasks.loop(minutes=1)
 async def reminder():
     if bot_ready:
-
         global reminder24hr_sent
         global reminder1hr_sent
 
-        timenow_iso_utc = datetime.now(tz=utc_tz).isoformat(timespec='seconds')
-        next_kickoff_iso_utc = nextFixture['fixture']['date']
-
-        timenow_utc = datetime.strptime(timenow_iso_utc, '%Y-%m-%dT%H:%M:%S%z')
-        next_kickoff_utc = datetime.strptime(next_kickoff_iso_utc, '%Y-%m-%dT%H:%M:%S%z')
-
-        # Check difference in times
-        year_diff = next_kickoff_utc.year - timenow_utc.year
-        month_diff = next_kickoff_utc.month - timenow_utc.month
-        day_diff = next_kickoff_utc.day - timenow_utc.day
-
-        hour_diff = next_kickoff_utc.hour - timenow_utc.hour
-        minute_diff = next_kickoff_utc.minute - timenow_utc.minute
-
-        # datetime is naive, so set timezone
-        next_kickoff_utc = next_kickoff_utc.replace(tzinfo=utc_tz)
-        timenow_utc = timenow_utc.replace(tzinfo=utc_tz)
-
-        next_kickoff_uk = next_kickoff_utc.astimezone(uk_tz)
-
-        # Convert back to strings to allow for leading 0s
-        next_kickoff_hour = next_kickoff_uk.strftime("%H")
-        next_kickoff_minute = next_kickoff_uk.strftime("%M")
-
-        next_home_team = nextFixture['teams']['home']['name']
-        next_away_team = nextFixture['teams']['away']['name']
-        competition = nextFixture['league']['name']
-        competition_round = nextFixture['league']['round']
-        competition_icon_url = nextFixture['league']['logo']
-
-        if next_home_team == 'West Ham':
-            is_home = True
-            opposition_logo = nextFixture['teams']['away']['logo']
-        else:
-            is_home = False
-            opposition_logo = nextFixture['teams']['home']['logo']
-
-        predictions_prompt = f'Get your predictions in now using *{command_prefix}p*'
-
-        this_channel = bot.get_channel(channel_id)
-
-        if year_diff == 0 and month_diff == 0 and day_diff == 1\
-                and hour_diff == 0 and minute_diff <= 0 and not reminder24hr_sent:
-            if is_home:
-                response = f'**West Ham vs {next_away_team}** starts in less than 24 hours ' \
-                           f'at {next_kickoff_hour}:{next_kickoff_minute} UK Time'
-            else:
-                response = f'**{next_home_team} vs West Ham** starts in less than 24 hours ' \
-                           f'at {next_kickoff_hour}:{next_kickoff_minute} UK Time'
-
-            em = discord.Embed(title="**Match Reminder**",
-                               description=f'{response}\n{predictions_prompt}',
-                               colour=discord.Colour.from_rgb(129, 19, 49))
-            em.set_thumbnail(url=opposition_logo)
-            em.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
-            await this_channel.send(embed=em)
-            print(f'Fixture 24hr reminder sent')
-            reminder24hr_sent = True
-            await write_reminder_and_match_status()
-
-
-        elif year_diff == 0 and month_diff == 0 and day_diff == 0\
-                and hour_diff == 1 and minute_diff <= 0 and not reminder1hr_sent:
-            if is_home:
-                response = f'**West Ham vs {next_away_team}** starts in less than 1 hour ' \
-                           f'at {next_kickoff_hour}:{next_kickoff_minute} UK Time'
-            else:
-                response = f'**{next_home_team} vs West Ham** starts in less than 1 hour ' \
-                           f'at {next_kickoff_hour}:{next_kickoff_minute} UK Time'
-
-            em = discord.Embed(title="**Match Reminder**",
-                               description=f'{response}\n{predictions_prompt}',
-                               colour=discord.Colour.from_rgb(129, 19, 49))
-            em.set_thumbnail(url=opposition_logo)
-            em.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
-            await this_channel.send(embed=em)
-            print(f'Fixture 1hr reminder sent')
-            reminder1hr_sent = True
-            await write_reminder_and_match_status()
-
+        # timenow_iso_utc = datetime.now(tz=utc_tz).isoformat(timespec='seconds')
+        # next_kickoff_iso_utc = nextFixture['fixture']['date']
+        #
+        # timenow_utc = datetime.strptime(timenow_iso_utc, '%Y-%m-%dT%H:%M:%S%z')
+        # next_kickoff_utc = datetime.strptime(next_kickoff_iso_utc, '%Y-%m-%dT%H:%M:%S%z')
+        #
+        # # Check difference in times
+        # year_diff = next_kickoff_utc.year - timenow_utc.year
+        # month_diff = next_kickoff_utc.month - timenow_utc.month
+        # day_diff = next_kickoff_utc.day - timenow_utc.day
+        #
+        # hour_diff = next_kickoff_utc.hour - timenow_utc.hour
+        # minute_diff = next_kickoff_utc.minute - timenow_utc.minute
+        #
+        # # datetime is naive, so set timezone
+        # next_kickoff_utc = next_kickoff_utc.replace(tzinfo=utc_tz)
+        # timenow_utc = timenow_utc.replace(tzinfo=utc_tz)
+        #
+        # next_kickoff_uk = next_kickoff_utc.astimezone(uk_tz)
+        #
+        # # Convert back to strings to allow for leading 0s
+        # next_kickoff_hour = next_kickoff_uk.strftime("%H")
+        # next_kickoff_minute = next_kickoff_uk.strftime("%M")
+        #
+        # next_home_team = nextFixture['teams']['home']['name']
+        # next_away_team = nextFixture['teams']['away']['name']
+        # competition = nextFixture['league']['name']
+        # competition_round = nextFixture['league']['round']
+        # competition_icon_url = nextFixture['league']['logo']
+        #
+        # if next_home_team == 'West Ham':
+        #     is_home = True
+        #     opposition_logo = nextFixture['teams']['away']['logo']
+        # else:
+        #     is_home = False
+        #     opposition_logo = nextFixture['teams']['home']['logo']
+        #
+        # predictions_prompt = f'Get your predictions in now using *{command_prefix}p*'
+        #
+        # this_channel = bot.get_channel(channel_id)
+        #
+        # if year_diff == 0 and month_diff == 0 and day_diff == 1\
+        #         and hour_diff == 0 and minute_diff <= 0 and not reminder24hr_sent:
+        #     if is_home:
+        #         response = f'**West Ham vs {next_away_team}** starts in less than 24 hours ' \
+        #                    f'at {next_kickoff_hour}:{next_kickoff_minute} UK Time'
+        #     else:
+        #         response = f'**{next_home_team} vs West Ham** starts in less than 24 hours ' \
+        #                    f'at {next_kickoff_hour}:{next_kickoff_minute} UK Time'
+        #
+        #     em = discord.Embed(title="**Match Reminder**",
+        #                        description=f'{response}\n{predictions_prompt}',
+        #                        colour=discord.Colour.from_rgb(129, 19, 49))
+        #     em.set_thumbnail(url=opposition_logo)
+        #     em.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
+        #     await this_channel.send(embed=em)
+        #     print(f'Fixture 24hr reminder sent')
+        #     reminder24hr_sent = True
+        #     await write_reminder_and_match_status()
+        #
+        #
+        # elif year_diff == 0 and month_diff == 0 and day_diff == 0\
+        #         and hour_diff == 1 and minute_diff <= 0 and not reminder1hr_sent:
+        #     if is_home:
+        #         response = f'**West Ham vs {next_away_team}** starts in less than 1 hour ' \
+        #                    f'at {next_kickoff_hour}:{next_kickoff_minute} UK Time'
+        #     else:
+        #         response = f'**{next_home_team} vs West Ham** starts in less than 1 hour ' \
+        #                    f'at {next_kickoff_hour}:{next_kickoff_minute} UK Time'
+        #
+        #     em = discord.Embed(title="**Match Reminder**",
+        #                        description=f'{response}\n{predictions_prompt}',
+        #                        colour=discord.Colour.from_rgb(129, 19, 49))
+        #     em.set_thumbnail(url=opposition_logo)
+        #     em.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
+        #     await this_channel.send(embed=em)
+        #     print(f'Fixture 1hr reminder sent')
+        #     reminder1hr_sent = True
+        #     await write_reminder_and_match_status()
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -558,11 +463,11 @@ async def give_results():
                     each.predictionStreak += 1
                     if each.predictionStreak < each.longestPredictionStreak:
                         each.longestPredictionStreak = each.predictionStreak
-                    each.previousPredictionCorrect = True
+                    each.previousPredictionCorrect = 1
                 # else if wrong, set streak to 0 and previousPredictionCorrect to False
                 else:
                     each.predictionStreak = 0
-                    each.previousPredictionCorrect = False
+                    each.previousPredictionCorrect = 0
 
             response = f'The match finished **{fixture_result_full}**'
 
@@ -583,12 +488,11 @@ async def give_results():
             em.set_thumbnail(url=west_ham_logo)
             em.set_footer(text=f'{competition} ({competition_round})', icon_url=competition_icon_url)
 
-
-            #for each in discord_channels:
+            # for each in discord_channels:
             this_channel = bot.get_channel(channel_id)
             await this_channel.send(embed=em)
 
-            #await this_channel.send(response)
+            # await this_channel.send(response)
             print(f'Prediction results sent')
 
             # now clear all user Objects' current predictions in the list
@@ -633,9 +537,9 @@ async def null_result(null_fixture_status):
 
     await next_fixture()
 
+
 @bot.event
 async def postponed_fixture(postponed_fixture_status):
-
     for each in currentUsersClassList:
         each.currentPrediction = None
     # write class to file
@@ -673,7 +577,7 @@ async def next_fixture():
         global match_started_status
         match_started_status = False
 
-        await write_reminder_and_match_status()
+        # await write_reminder_and_match_status()
 
         # Grab details for next match
         next_home_team = nextFixture['teams']['home']['name']
@@ -751,31 +655,6 @@ async def fixture_today(current_date, fixture_date):
     else:
         return False
 
-# When the bot joins a server
-@bot.event
-async def on_ready():
-    global bot_ready
-    global currentUsersClassList
-    print(f'{bot.user.name} has connected to Discord!')
-    # Commented out the message in discord to avoid spam as Heroku restarts applications once a day
-    # results = f'{bot.user.name} has connected to Discord!'
-    next_fixture_id = await get_next_fixture_id()
-    await get_next_fixture_datetime(next_fixture_id)
-    await read_reminder_and_match_status()
-    bot_ready = True
-    try:
-        await read_from_database()
-    except:
-        currentUsersClassList = []
-        print(f'currentUsersClass has been set to empty as file read failed')
-    #for each in discord_channels:
-    this_channel = bot.get_channel(channel_id)
-    # Commented out the message in discord to avoid spam as Heroku restarts applications once a day
-    # await this_channel.send(results)
-    await set_status()
-    # Commented out the next_fixture in discord to avoid spam as Heroku restarts applications once a day
-    # await next_fixture()
-
 
 # Set bot status
 async def set_status():
@@ -784,7 +663,7 @@ async def set_status():
     print(f'Bot status set')
 
 
-# Bot help section
+# # Bot help section
 # ----------------------------------------------------------------------------------------------------------------------
 @bot.group(invoke_without_command=True)
 async def help(ctx):
@@ -926,12 +805,12 @@ async def user_prediction_command(ctx, score):
                         # to be used for Score Streak in Future Feature
                         if each.currentPrediction is None:
                             predictions_updated = True
-                            response = f"You have predicted {home_team} {score} {away_team}\n"\
+                            response = f"You have predicted {home_team} {score} {away_team}\n" \
                                        + random.choice(correct_score_format) + author_mention_name + '!'
                         else:
                             predictions_updated = True
-                            response = '_Prediction updated_\n'\
-                                       f"You have predicted {home_team} {score} {away_team}\n"\
+                            response = '_Prediction updated_\n' \
+                                       f"You have predicted {home_team} {score} {away_team}\n" \
                                        + random.choice(correct_score_format) + author_mention_name + '!'
                         # update that user's current prediction
                         each.currentPrediction = score
@@ -953,7 +832,7 @@ async def user_prediction_command(ctx, score):
                     # json.dumps(currentUsersClassList, indent=2)
                     # json.dump(currentUsersClassList, f, indent=2)
 
-                    response = f"You have predicted {home_team} {score} {away_team}\n"\
+                    response = f"You have predicted {home_team} {score} {away_team}\n" \
                                + random.choice(correct_score_format) + author_mention_name + '!'
 
                     print(f'A user has made a prediction - {author_text_name} {score}')
@@ -965,7 +844,6 @@ async def user_prediction_command(ctx, score):
         else:
             response = f"Please structure your prediction correctly e.g. *{command_prefix}p 1-0*"
 
-
     await ctx.send(response)
 
 
@@ -975,7 +853,7 @@ async def correct_scores(ctx):
     response = "It looks like you haven't made any predictions yet!"
     for each in currentUsersClassList:
         if each.mentionName == author_mention_name:
-            if each.previousPredictionCorrect:
+            if each.previousPredictionCorrect == 1:
                 response = f'You have correctly predicted {each.numCorrectPredictions} result(s)' \
                            f' and your previous guess was correct. Good luck on your prediction streak, ' \
                            f'it is currently {each.predictionStreak} in a row.'
@@ -1072,6 +950,7 @@ async def force_backup(ctx):
 
     print(f'Force backup run in {ctx.guild.name} ({ctx.guild.id}) by {ctx.message.author}')
 
+
 @bot.command(name='force-dbsync', help='Admin Only - Force a database sync')
 @commands.has_permissions(administrator=True)
 async def force_dbsync(ctx):
@@ -1098,9 +977,13 @@ async def save_to_database():
         })
 
     try:
-        sql_query = '''select * from users'''
+        # clear current database
+        sql_query = '''truncate users;'''
         mysql.cursor.execute(sql_query)
-        data = mysql.cursor.fetchall()
+        mysql.db.commit()
+        print(f'database cleared')
+
+        # write users in memory to database
         sql_query = '''
                     INSERT INTO users (mentionName, username, currentPrediction, predictionTimestamp,
                     numCorrectPredictions, previousPredictionCorrect, predictionStreak, longestPredictionStreak)
@@ -1129,7 +1012,6 @@ async def save_to_database():
         print(f'database write failed')
 
 
-
 async def read_from_database():
     try:
         sql_query = '''select mentionName,username, currentPrediction, predictionTimestamp,
@@ -1149,7 +1031,6 @@ async def read_from_database():
         print(f'database read success')
     except:
         print(f'database read failed')
-
 
 
 async def save_error_to_file(error_string):
@@ -1189,8 +1070,8 @@ async def save_error_to_file(error_string):
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-    # To sort out double digit correct predictions
-    # maybe add a white space to single digit values to match spacing of double digit values?
+# To sort out double digit correct predictions
+# maybe add a white space to single digit values to match spacing of double digit values?
 
 @bot.event
 async def leaderboard():
@@ -1211,17 +1092,16 @@ async def leaderboard():
     for x in sorted_key:
         leaderboard_dict[x] = unsorted_leaderboard_dict[x]
 
-    leaderboard_dict = {k:v for k, v in leaderboard_dict.items() if v != 0}
-
+    leaderboard_dict = {k: v for k, v in leaderboard_dict.items() if v != 0}
 
     # Format response into a table using Embed & monospaced code block
     if leaderboard_dict:
         title = "Correct Predictions"
-        leaderboard_string = ("```" + "\n".join("  {}  |  {}".format(v, k) for k, v in leaderboard_dict.items()) + "```")
+        leaderboard_string = (
+                    "```" + "\n".join("  {}  |  {}".format(v, k) for k, v in leaderboard_dict.items()) + "```")
     else:
         title = f"No one has got a prediction right yet"
         leaderboard_string = f"See if you can be the first!"
-
 
     embed = discord.Embed(title="Top Predictors Leaderboard", colour=discord.Colour.from_rgb(129, 19, 49))
     embed.add_field(name=title, value=leaderboard_string)
@@ -1301,7 +1181,6 @@ async def predictions():
 
         predictions_string = '\n'.join(current_predictions_list)
 
-
         if is_home:
             response = f'Score predictions for *West Ham vs {away_team}*\n' \
                        f'in the {competition} ({competition_round})'
@@ -1324,7 +1203,8 @@ async def predictions():
     this_channel = bot.get_channel(channel_id)
     await this_channel.send(embed=embed)
 
-    #await ctx.send(embed=embed)
+    # await ctx.send(embed=embed)
+
 
 @bot.event
 async def match_begin():
@@ -1356,8 +1236,7 @@ async def match_begin():
     await this_channel.send(embed=embed)
     global match_started_status
     match_started_status = True
-    await write_reminder_and_match_status()
-
+    # await write_reminder_and_match_status()
 
 
 # Bot Error testing
@@ -1375,9 +1254,7 @@ async def on_error(event, *args, **kwargs):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-
-
-check_fixtures.start()
+get_next_fixture_loop.start()
 check_next_fixture.start()
 check_save.start()
 reminder.start()
